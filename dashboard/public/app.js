@@ -61,6 +61,44 @@ async function loadSummary() {
   }
 }
 
+async function loadStats() {
+  try {
+    const stats = await fetchAPI('/api/stats');
+    
+    document.getElementById('streams-today').textContent = stats.streamsToday;
+    
+    const hours = Math.floor(stats.totalStreamTime / 3600);
+    const minutes = Math.floor((stats.totalStreamTime % 3600) / 60);
+    document.getElementById('total-stream-time').textContent = `${hours}h ${minutes}m`;
+    
+    const avgMinutes = Math.floor(stats.avgStreamDuration / 60);
+    document.getElementById('avg-duration').textContent = `${avgMinutes}m`;
+    
+    document.getElementById('most-active').textContent = stats.mostActiveStreamer ? 
+      `${stats.mostActiveStreamer.userId} (${stats.mostActiveStreamer.count})` : '-';
+
+    // Update live alerts
+    const alertsDiv = document.getElementById('live-alerts');
+    if (stats.recentLive && stats.recentLive.length > 0) {
+      alertsDiv.innerHTML = stats.recentLive.map(stream => {
+        const timeAgo = Math.floor((Date.now() - stream.startTime) / 1000);
+        const minutesAgo = Math.floor(timeAgo / 60);
+        return `
+          <div class="alert-box live">
+            <div class="alert-header">🔴 LIVE NOW: ${stream.user.uniqueId || stream.userId}</div>
+            <div>Started ${minutesAgo} minute${minutesAgo !== 1 ? 's' : ''} ago</div>
+            <div style="margin-top: 5px; font-style: italic;">${stream.title}</div>
+          </div>
+        `;
+      }).join('');
+    } else {
+      alertsDiv.innerHTML = '';
+    }
+  } catch (err) {
+    console.error('Failed to load stats:', err);
+  }
+}
+
 async function loadLiveStreams() {
   try {
     const state = await fetchAPI('/api/state');
@@ -97,22 +135,83 @@ async function loadLiveStreams() {
   }
 }
 
+async function loadLiveHistory() {
+  try {
+    const data = await fetchAPI('/api/live-history');
+    const list = document.getElementById('live-history-list');
+    list.innerHTML = '';
+
+    if (data.history.length === 0) {
+      list.innerHTML = '<li>No live streams recorded yet</li>';
+      return;
+    }
+
+    data.history.forEach(entry => {
+      const li = document.createElement('li');
+      const startDate = new Date(entry.startTime).toLocaleString();
+      const endDate = entry.endTime ? new Date(entry.endTime).toLocaleString() : 'Ongoing';
+      const duration = entry.endTime ? Math.floor((entry.endTime - entry.startTime) / 1000) : Math.floor((Date.now() - entry.startTime) / 1000);
+
+      li.innerHTML = `
+        <strong>${entry.userId}</strong><br>
+        Title: ${entry.title}<br>
+        Started: ${startDate}<br>
+        Ended: ${endDate}<br>
+        Duration: ${Math.floor(duration / 3600)}h ${Math.floor((duration % 3600) / 60)}m<br>
+        <a href="https://www.tiktok.com/@${entry.userId}" target="_blank">View Profile</a>
+      `;
+      list.appendChild(li);
+    });
+  } catch (err) {
+    console.error('Failed to load live history:', err);
+    document.getElementById('live-history-list').innerHTML = '<li>Error loading history</li>';
+  }
+}
+
 async function loadTikTokUsers() {
   try {
     const data = await fetchAPI('/api/tiktok-users');
     const list = document.getElementById('tiktok-users-list');
     list.innerHTML = '';
 
-    if (data.users.length === 0) {
+    if (!data.users || data.users.length === 0) {
       list.innerHTML = '<li>No TikTok users configured</li>';
       return;
     }
 
-    data.users.forEach(user => {
+    data.users.forEach(userInfo => {
+      console.log('User info:', userInfo);
       const li = document.createElement('li');
+      const username = userInfo.username;
+      const statusBadge = userInfo.isLive ? 
+        '<span class="badge live">🔴 LIVE</span>' : 
+        '<span class="badge offline">OFFLINE</span>';
+      
+      let lastStreamInfo = '';
+      if (userInfo.lastStream) {
+        const lastDate = new Date(userInfo.lastStream.startTime);
+        const daysAgo = Math.floor((Date.now() - userInfo.lastStream.startTime) / (1000 * 60 * 60 * 24));
+        const duration = userInfo.lastStream.duration ? 
+          `${Math.floor(userInfo.lastStream.duration / 3600)}h ${Math.floor((userInfo.lastStream.duration % 3600) / 60)}m` : 
+          'Ongoing';
+        
+        lastStreamInfo = `
+          <div class="user-info">
+            <strong>Last Stream:</strong> ${daysAgo === 0 ? 'Today' : daysAgo === 1 ? 'Yesterday' : daysAgo + ' days ago'}<br>
+            <strong>Duration:</strong> ${duration}<br>
+            <strong>Title:</strong> ${userInfo.lastStream.title || 'No title'}
+          </div>
+        `;
+      } else {
+        lastStreamInfo = '<div class="user-info">No stream history</div>';
+      }
+
       li.innerHTML = `
-        <strong>${user}</strong><br>
-        <a href="https://www.tiktok.com/@${user}" target="_blank">View Profile</a>
+        <div style="margin-bottom: 10px;">
+          <strong style="font-size: 1.1em;">${username}</strong> ${statusBadge}
+        </div>
+        ${lastStreamInfo}
+        <iframe src="https://www.tiktok.com/embed/@${username}" width="50%" height="600" frameborder="0" allowfullscreen style="border-radius: 8px;"></iframe>
       `;
       list.appendChild(li);
     });
@@ -165,18 +264,9 @@ async function loadSystemInfo() {
     document.getElementById('cpu-usage').textContent = `${sys.cpu.usagePercent}%`;
     document.getElementById('mem-usage').textContent = `${sys.memory.usagePercent}%`;
     document.getElementById('uptime').textContent = formatUptime(sys.uptime);
-    document.getElementById('hostname').textContent = sys.hostname;
-    document.getElementById('platform').textContent = `${sys.platform} ${sys.arch}`;
-    document.getElementById('cpu-cores').textContent = sys.cpu.cores;
-    document.getElementById('memory-info').textContent =
-      `${formatBytes(sys.memory.used)} / ${formatBytes(sys.memory.total)}`;
-
-    // Update last updated timestamp
-    const now = new Date();
-    document.getElementById('last-updated').textContent = now.toLocaleTimeString();
 
     // Store historical data
-    const timestamp = now.toLocaleTimeString('en-US', {
+    const timestamp = new Date().toLocaleTimeString('en-US', {
       hour12: false,
       hour: '2-digit',
       minute: '2-digit',
@@ -320,7 +410,9 @@ function startAutoRefresh(interval = 2000) {
 
   autoRefreshInterval = setInterval(() => {
     loadSummary();
+    loadStats();
     loadLiveStreams();
+    loadLiveHistory();
     loadSystemInfo();
   }, interval);
 }
@@ -352,7 +444,9 @@ function changeUpdateInterval() {
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
   loadSummary();
+  loadStats();
   loadLiveStreams();
+  loadLiveHistory();
   loadTikTokUsers();
   loadLogDates();
   loadSystemInfo();

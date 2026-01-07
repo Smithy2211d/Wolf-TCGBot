@@ -136,7 +136,7 @@ async function recordRequest() {
 }
 
 const stateFile = path.join(__dirname, "stream_state.json");
-let persistentState = { sentMessages: {}, streamStartTimes: {}, liveStatus: {}, userCache: {}, titleCache: {} };
+let persistentState = { sentMessages: {}, streamStartTimes: {}, liveStatus: {}, userCache: {}, titleCache: {}, liveHistory: [] };
 if (existsSync(stateFile)) {
   try {
     persistentState = JSON.parse(readFileSync(stateFile, "utf8"));
@@ -150,6 +150,7 @@ const streamStartTimes = persistentState.streamStartTimes;
 const liveStatus = persistentState.liveStatus;
 const userCache = persistentState.userCache || {};
 const titleCache = persistentState.titleCache || {};
+const liveHistory = persistentState.liveHistory || [];
 
 function saveState() {
   writeFileSync(stateFile, JSON.stringify(persistentState, null, 2), "utf8");
@@ -338,6 +339,7 @@ function connectEulerWSForUser(username) {
         streamStartTimes[userId] = streamStart;
         userCache[userId] = { uniqueId: user.uniqueId, avatarUrl: user.avatarUrl };
         if (room.title?.trim()) titleCache[userId] = room.title.trim();
+        liveHistory.push({ userId, startTime: streamStart, endTime: null, title: room.title?.trim() || 'No title' });
         saveState();
 
         try {
@@ -383,6 +385,8 @@ function connectEulerWSForUser(username) {
             });
             sentMessages[userId] = newMsg.id;
           }
+          const historyEntry = liveHistory.find(h => h.userId === userId && h.endTime === null);
+          if (historyEntry) historyEntry.endTime = Date.now();
           liveStatus[userId] = false;
           delete titleCache[userId];
           saveState();

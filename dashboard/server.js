@@ -5,8 +5,28 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import os from 'os';
+import dotenv from 'dotenv';
+import { readFileSync, existsSync } from 'fs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+// Load environment variables
+const envPath = path.join(__dirname, '..', '.env');
+console.log('Loading .env from:', envPath);
+if (existsSync(envPath)) {
+  console.log('.env exists, loading');
+  dotenv.config({ path: envPath });
+} else {
+  console.log('.env does not exist');
+  try {
+    const envBuffer = readFileSync(envPath);
+    const parsed = dotenv.parse(envBuffer);
+    for (const [key, value] of Object.entries(parsed)) process.env[key] = value;
+  } catch {
+    console.warn("⚠️ .env not found. Make sure environment variables are set!");
+  }
+}
+
 const app = express();
 const PORT = process.env.DASHBOARD_PORT || 3000;
 
@@ -15,12 +35,17 @@ let previousCpuTimes = null;
 let previousMeasurementTime = null;
 
 // Basic auth for security (set DASHBOARD_USER and DASHBOARD_PASS in .env)
-if (process.env.DASHBOARD_USER && process.env.DASHBOARD_PASS) {
-  app.use(basicAuth({
-    users: { [process.env.DASHBOARD_USER]: process.env.DASHBOARD_PASS },
-    challenge: true,
-  }));
-}
+// console.log('DASHBOARD_USER:', process.env.DASHBOARD_USER);
+// console.log('DASHBOARD_PASS:', process.env.DASHBOARD_PASS);
+// if (process.env.DASHBOARD_USER && process.env.DASHBOARD_PASS) {
+//   console.log('Enabling basic auth');
+//   app.use(basicAuth({
+//     users: { [process.env.DASHBOARD_USER]: process.env.DASHBOARD_PASS },
+//     challenge: true,
+//   }));
+// } else {
+//   console.log('Basic auth not enabled');
+// }
 
 app.use(cors());
 app.use(express.json());
@@ -89,11 +114,18 @@ app.get('/api/summary', (req, res) => {
     const statePath = path.join(__dirname, '..', 'stream_state.json');
     const reqPath = path.join(__dirname, '..', 'request_counter.json');
 
-    const state = JSON.parse(fs.readFileSync(statePath, 'utf8'));
+    let state = { liveStatus: {} };
+    if (fs.existsSync(statePath)) {
+      state = JSON.parse(fs.readFileSync(statePath, 'utf8'));
+    }
     const requests = JSON.parse(fs.readFileSync(reqPath, 'utf8'));
 
     const liveCount = Object.values(state.liveStatus || {}).filter(Boolean).length;
-    const totalUsers = Object.keys(state.liveStatus || {}).length;
+    const tikTokUsers = (process.env.TIKTOK_USERS || "")
+      .split(",")
+      .map((u) => u.trim())
+      .filter((u) => u);
+    const totalUsers = tikTokUsers.length;
 
     res.json({
       liveStreams: liveCount,
@@ -103,23 +135,129 @@ app.get('/api/summary', (req, res) => {
       date: requests.date
     });
   } catch (err) {
+    console.error('Error in /api/summary:', err);
     res.status(500).json({ error: 'Failed to generate summary' });
+  }
+});
+
+app.get('/api/live-history', (req, res) => {
+  try {
+    const statePath = path.join(__dirname, '..', 'stream_state.json');
+    let state = { liveHistory: [] };
+    if (fs.existsSync(statePath)) {
+      state = JSON.parse(fs.readFileSync(statePath, 'utf8'));
+    }
+    // Return last 20 entries, sorted by startTime descending
+    const history = (state.liveHistory || [])
+      .sort((a, b) => b.startTime - a.startTime)
+      .slice(0, 20);
+    res.json({ history });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to load live history' });
   }
 });
 
 app.get('/api/tiktok-users', (req, res) => {
   try {
+    const statePath = path.join(__dirname, '..', 'stream_state.json');
+    let state = { liveHistory: [], liveStatus: {}, streamStartTimes: {} };
+    if (fs.existsSync(statePath)) {
+      state = JSON.parse(fs.readFileSync(statePath, 'utf8'));
+    }
+
     const tikTokUsers = (process.env.TIKTOK_USERS || "")
       .split(",")
       .map((u) => u.trim())
       .filter((u) => u);
 
+    // Add last stream info for each user
+    const usersWithInfo = tikTokUsers.map(user => {
+      const isLive = state.liveStatus?.[user] || false;
+      const lastStream = (state.liveHistory || [])
+        .filter(entry => entry.userId === user)
+        .sort((a, b) => b.startTime - a.startTime)[0];
+
+      return {
+        username: user,
+        isLive: isLive,
+        lastStream: lastStream ? {
+          startTime: lastStream.startTime,
+          endTime: lastStream.endTime,
+          duration: lastStream.endTime ? (lastStream.endTime - lastStream.startTime) / 1000 : null,
+          title: lastStream.title || 'No title'
+        } : null
+      };
+    });
+
+    console.log('TikTok users from env:', tikTokUsers);
+    console.log('TikTok users API returning:', usersWithInfo);
+    res.json({ users: usersWithInfo });
+  } catch (err) {
+    console.error('Error in /api/tiktok-users:', err);
+    res.status(500).json({ error: 'Failed to load TikTok users' });
+  }
+});
+
+app.get('/api/stats', (req, res) => {
+  try {
+    const statePath = path.join(__dirname, '..', 'stream_state.json');
+    let state = { liveHistory: [], liveStatus: {}, streamStartTimes: {} };
+    if (fs.existsSync(statePath)) {
+      state = JSON.parse(fs.readFileSync(statePath, 'utf8'));
+    }
+
+    const now = Date.now();
+    const todayStart = new Date().setHours(0, 0, 0, 0);
+    
+    // Filter today's streams
+    const todayStreams = (state.liveHistory || []).filter(entry => 
+      entry.startTime >= todayStart
+    );
+
+    // Calculate stats
+    const streamsToday = todayStreams.length;
+    const totalStreamTime = todayStreams.reduce((sum, entry) => {
+      const duration = entry.endTime ? (entry.endTime - entry.startTime) : (now - entry.startTime);
+      return sum + duration / 1000; // in seconds
+    }, 0);
+
+    const avgStreamDuration = streamsToday > 0 ? totalStreamTime / streamsToday : 0;
+
+    // Find most active streamer
+    const streamerCounts = {};
+    todayStreams.forEach(entry => {
+      streamerCounts[entry.userId] = (streamerCounts[entry.userId] || 0) + 1;
+    });
+    const mostActive = Object.entries(streamerCounts)
+      .sort((a, b) => b[1] - a[1])[0];
+
+    // Recent live alerts (last 5 minutes)
+    const recentThreshold = now - (5 * 60 * 1000);
+    const recentLive = Object.entries(state.liveStatus || {})
+      .filter(([userId, isLive]) => {
+        const startTime = state.streamStartTimes?.[userId];
+        return isLive && startTime && startTime >= recentThreshold;
+      })
+      .map(([userId]) => ({
+        userId,
+        startTime: state.streamStartTimes[userId],
+        title: state.titleCache?.[userId] || 'No title',
+        user: state.userCache?.[userId] || {}
+      }));
+
     res.json({
-      users: tikTokUsers,
-      count: tikTokUsers.length
+      streamsToday,
+      totalStreamTime: Math.round(totalStreamTime),
+      avgStreamDuration: Math.round(avgStreamDuration),
+      mostActiveStreamer: mostActive ? {
+        userId: mostActive[0],
+        count: mostActive[1]
+      } : null,
+      recentLive
     });
   } catch (err) {
-    res.status(500).json({ error: 'Failed to get TikTok users' });
+    console.error('Error in /api/stats:', err);
+    res.status(500).json({ error: 'Failed to generate stats' });
   }
 });
 
