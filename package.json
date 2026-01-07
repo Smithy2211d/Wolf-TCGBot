@@ -1,0 +1,27 @@
+{
+  "name": "discord-bot-wolf-my-version",
+  "version": "1.0.0",
+  "description": "Discord Bot with built-in Embeds that uses Euler API Free Plan (https://www.eulerstream.com/) to periodically check whether or not a user is Live, then using Discord.js to send the notifications to a discord channel ID you provide.",
+  "main": "index.js",
+  "dependencies": {
+    "chalk": "^5.6.2",
+    "cors": "^2.8.5",
+    "discord.js": "^14.24.2",
+    "dotenv": "^16.6.1",
+    "express": "^5.2.1",
+    "express-basic-auth": "^1.2.1",
+    "ws": "^8.18.3"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.10"
+  },
+  "scripts": {
+    "start": "node index.js",
+    "dashboard": "node dashboard/server.js",
+    "dev": "nodemon index.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module"
+}
