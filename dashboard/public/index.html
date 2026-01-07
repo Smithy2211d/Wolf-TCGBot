@@ -81,6 +81,42 @@
     </div>
 
     <div class="card">
+      <h2>📈 Stream Analytics</h2>
+      <div class="summary">
+        <div class="summary-item">
+          <div class="summary-value" id="total-streams">0</div>
+          <div>Total Streams</div>
+        </div>
+        <div class="summary-item">
+          <div class="summary-value" id="total-time">0h</div>
+          <div>Total Time</div>
+        </div>
+        <div class="summary-item">
+          <div class="summary-value" id="avg-stream-duration">0m</div>
+          <div>Avg Duration</div>
+        </div>
+      </div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px;">
+        <div>
+          <h3 style="margin-top: 0;">Streams by Day of Week</h3>
+          <div class="chart-container" style="height: 250px;">
+            <canvas id="day-chart"></canvas>
+          </div>
+        </div>
+        <div>
+          <h3 style="margin-top: 0;">Peak Streaming Hours</h3>
+          <div class="chart-container" style="height: 250px;">
+            <canvas id="hour-chart"></canvas>
+          </div>
+        </div>
+      </div>
+      <div class="user-info">
+        <strong>🏆 Longest Stream:</strong> <span id="longest-stream">-</span><br>
+        <strong>⭐ Most Active Streamer:</strong> <span id="most-active-streamer">-</span>
+      </div>
+    </div>
+
+    <div class="card">
       <h2>Monitored TikTok Users</h2>
       <ul class="live-list" id="tiktok-users-list">
         <li>Loading...</li>

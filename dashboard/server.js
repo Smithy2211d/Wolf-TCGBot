@@ -237,6 +237,51 @@ app.get('/api/stats', (req, res) => {
   }
 });
 
+app.get('/api/analytics', (req, res) => {
+  try {
+    const statePath = path.join(__dirname, '..', 'stream_state.json');
+    let state = { analytics: null, liveHistory: [] };
+    
+    if (fs.existsSync(statePath)) {
+      state = JSON.parse(fs.readFileSync(statePath, 'utf8'));
+    }
+
+    if (!state.analytics) {
+      return res.json({
+        totalStreams: 0,
+        totalStreamTime: 0,
+        averageDuration: 0,
+        streamsByDay: {},
+        streamsByHour: {},
+        longestStream: { duration: 0, userId: null, date: null },
+        mostActiveStreamer: { userId: null, count: 0 },
+        recentStreams: []
+      });
+    }
+
+    // Get last 10 streams for recent activity
+    const recentStreams = (state.liveHistory || [])
+      .filter(entry => entry.endTime)
+      .sort((a, b) => b.startTime - a.startTime)
+      .slice(0, 10)
+      .map(entry => ({
+        userId: entry.userId,
+        startTime: entry.startTime,
+        endTime: entry.endTime,
+        duration: entry.endTime - entry.startTime,
+        title: entry.title || 'No title'
+      }));
+
+    res.json({
+      ...state.analytics,
+      recentStreams
+    });
+  } catch (err) {
+    console.error('Error in /api/analytics:', err);
+    res.status(500).json({ error: 'Failed to load analytics' });
+  }
+});
+
 app.get('/api/system', (req, res) => {
   try {
     const totalMem = os.totalmem();

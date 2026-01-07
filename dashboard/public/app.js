@@ -392,6 +392,105 @@ function formatBytes(bytes) {
 }
 
 let autoRefreshInterval = null;
+let dayChart, hourChart;
+
+async function loadAnalytics() {
+  try {
+    const analytics = await fetchAPI('/api/analytics');
+    
+    // Update summary values
+    document.getElementById('total-streams').textContent = analytics.totalStreams;
+    
+    const totalHours = Math.floor(analytics.totalStreamTime / (1000 * 3600));
+    document.getElementById('total-time').textContent = `${totalHours}h`;
+    
+    const avgMinutes = Math.floor(analytics.averageDuration / (1000 * 60));
+    document.getElementById('avg-stream-duration').textContent = `${avgMinutes}m`;
+    
+    // Longest stream
+    if (analytics.longestStream && analytics.longestStream.userId) {
+      const duration = Math.floor(analytics.longestStream.duration / (1000 * 60));
+      const date = new Date(analytics.longestStream.date).toLocaleDateString();
+      document.getElementById('longest-stream').textContent = 
+        `${analytics.longestStream.userId} - ${duration}m (${date})`;
+    } else {
+      document.getElementById('longest-stream').textContent = '-';
+    }
+    
+    // Most active streamer
+    if (analytics.mostActiveStreamer && analytics.mostActiveStreamer.userId) {
+      document.getElementById('most-active-streamer').textContent = 
+        `${analytics.mostActiveStreamer.userId} (${analytics.mostActiveStreamer.count} streams)`;
+    } else {
+      document.getElementById('most-active-streamer').textContent = '-';
+    }
+    
+    // Day of week chart
+    const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const dayData = daysOfWeek.map(day => analytics.streamsByDay[day] || 0);
+    
+    if (dayChart) {
+      dayChart.data.datasets[0].data = dayData;
+      dayChart.update();
+    } else {
+      const dayCtx = document.getElementById('day-chart').getContext('2d');
+      dayChart = new Chart(dayCtx, {
+        type: 'bar',
+        data: {
+          labels: daysOfWeek,
+          datasets: [{
+            label: 'Streams',
+            data: dayData,
+            backgroundColor: '#007bff'
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            y: { beginAtZero: true, ticks: { stepSize: 1 } }
+          }
+        }
+      });
+    }
+    
+    // Hour of day chart
+    const hourLabels = Array.from({length: 24}, (_, i) => `${i}:00`);
+    const hourData = Array.from({length: 24}, (_, i) => analytics.streamsByHour[i] || 0);
+    
+    if (hourChart) {
+      hourChart.data.datasets[0].data = hourData;
+      hourChart.update();
+    } else {
+      const hourCtx = document.getElementById('hour-chart').getContext('2d');
+      hourChart = new Chart(hourCtx, {
+        type: 'line',
+        data: {
+          labels: hourLabels,
+          datasets: [{
+            label: 'Streams',
+            data: hourData,
+            borderColor: '#28a745',
+            backgroundColor: 'rgba(40, 167, 69, 0.1)',
+            tension: 0.4,
+            fill: true
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            y: { beginAtZero: true, ticks: { stepSize: 1 } }
+          }
+        }
+      });
+    }
+  } catch (err) {
+    console.error('Failed to load analytics:', err);
+  }
+}
 
 function startAutoRefresh(interval = 2000) {
   if (autoRefreshInterval) {
@@ -404,6 +503,7 @@ function startAutoRefresh(interval = 2000) {
     loadLiveStreams();
     loadLiveHistory();
     loadSystemInfo();
+    loadAnalytics();
   }, interval);
 }
 
@@ -435,6 +535,7 @@ document.addEventListener('DOMContentLoaded', () => {
   loadTikTokUsers();
   loadLogDates();
   loadSystemInfo();
+  loadAnalytics();
   updateSystemChart();
   startAutoRefresh();
 

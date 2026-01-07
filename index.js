@@ -160,10 +160,38 @@ async function recordRequest() {
 }
 
 const stateFile = path.join(__dirname, "stream_state.json");
-let persistentState = { sentMessages: {}, streamStartTimes: {}, liveStatus: {}, userCache: {}, titleCache: {}, liveHistory: [] };
+let persistentState = { 
+  sentMessages: {}, 
+  streamStartTimes: {}, 
+  liveStatus: {}, 
+  userCache: {}, 
+  titleCache: {}, 
+  liveHistory: [],
+  analytics: {
+    totalStreams: 0,
+    totalStreamTime: 0,
+    streamsByDay: {},
+    streamsByHour: {},
+    averageDuration: 0,
+    longestStream: { duration: 0, userId: null, date: null },
+    mostActiveStreamer: { userId: null, count: 0 }
+  }
+};
 if (existsSync(stateFile)) {
   try {
     persistentState = JSON.parse(readFileSync(stateFile, "utf8"));
+    // Initialize analytics if missing
+    if (!persistentState.analytics) {
+      persistentState.analytics = {
+        totalStreams: 0,
+        totalStreamTime: 0,
+        streamsByDay: {},
+        streamsByHour: {},
+        averageDuration: 0,
+        longestStream: { duration: 0, userId: null, date: null },
+        mostActiveStreamer: { userId: null, count: 0 }
+      };
+    }
     logEvent("💾 Loaded previous stream state.", "gray");
   } catch {
     logEvent("⚠️ Failed to load stream_state.json, starting fresh.", "yellow");
@@ -175,9 +203,48 @@ const liveStatus = persistentState.liveStatus;
 const userCache = persistentState.userCache || {};
 const titleCache = persistentState.titleCache || {};
 const liveHistory = persistentState.liveHistory || [];
+const analytics = persistentState.analytics;
 
 function saveState() {
   writeFileSync(stateFile, JSON.stringify(persistentState, null, 2), "utf8");
+}
+
+function updateAnalytics(userId, startMs, endMs) {
+  const duration = endMs - startMs;
+  const startDate = new Date(startMs);
+  const dayOfWeek = startDate.toLocaleDateString('en-US', { weekday: 'long' });
+  const hour = startDate.getHours();
+
+  // Update totals
+  analytics.totalStreams++;
+  analytics.totalStreamTime += duration;
+  analytics.averageDuration = analytics.totalStreamTime / analytics.totalStreams;
+
+  // Track by day of week
+  analytics.streamsByDay[dayOfWeek] = (analytics.streamsByDay[dayOfWeek] || 0) + 1;
+
+  // Track by hour
+  analytics.streamsByHour[hour] = (analytics.streamsByHour[hour] || 0) + 1;
+
+  // Check for longest stream
+  if (duration > analytics.longestStream.duration) {
+    analytics.longestStream = {
+      duration,
+      userId,
+      date: startDate.toISOString()
+    };
+  }
+
+  // Update most active streamer
+  const userStreamCount = liveHistory.filter(h => h.userId === userId && h.endTime).length;
+  if (userStreamCount > analytics.mostActiveStreamer.count) {
+    analytics.mostActiveStreamer = {
+      userId,
+      count: userStreamCount
+    };
+  }
+
+  saveState();
 }
 
 const client = new Client({
@@ -414,7 +481,11 @@ function connectEulerWSForUser(username) {
             sentMessages[userId] = newMsg.id;
           }
           const historyEntry = liveHistory.find(h => h.userId === userId && h.endTime === null);
-          if (historyEntry) historyEntry.endTime = Date.now();
+          if (historyEntry) {
+            historyEntry.endTime = now;
+            // Update analytics when stream ends
+            updateAnalytics(userId, startMs, now);
+          }
           liveStatus[userId] = false;
           delete titleCache[userId];
           saveState();
@@ -476,6 +547,13 @@ function connectEulerWSForUser(username) {
             embeds: [embed],
             components: [liveActionRow(username, false)],
           });
+        }
+
+        const historyEntry = liveHistory.find(h => h.userId === username && h.endTime === null);
+        if (historyEntry) {
+          historyEntry.endTime = now;
+          // Update analytics when stream ends due to failed reconnects
+          updateAnalytics(username, startMs, now);
         }
 
         liveStatus[username] = false;
