@@ -1,5 +1,5 @@
 {
-  "name": "discord-bot-wolf-my-version",
+  "name": "wolf-tcg-bot",
   "version": "1.0.0",
   "description": "Discord Bot with built-in Embeds that uses Euler API Free Plan (https://www.eulerstream.com/) to periodically check whether or not a user is Live, then using Discord.js to send the notifications to a discord channel ID you provide.",
   "main": "index.js",
