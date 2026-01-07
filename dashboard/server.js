@@ -10,7 +10,6 @@ import { readFileSync, existsSync } from 'fs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// Load environment variables
 const envPath = path.join(__dirname, '..', '.env');
 console.log('Loading .env from:', envPath);
 if (existsSync(envPath)) {
@@ -30,30 +29,14 @@ if (existsSync(envPath)) {
 const app = express();
 const PORT = process.env.DASHBOARD_PORT || 3000;
 
-// Store previous CPU measurements for accurate usage calculation
 let previousCpuTimes = null;
 let previousMeasurementTime = null;
-
-// Basic auth for security (set DASHBOARD_USER and DASHBOARD_PASS in .env)
-// console.log('DASHBOARD_USER:', process.env.DASHBOARD_USER);
-// console.log('DASHBOARD_PASS:', process.env.DASHBOARD_PASS);
-// if (process.env.DASHBOARD_USER && process.env.DASHBOARD_PASS) {
-//   console.log('Enabling basic auth');
-//   app.use(basicAuth({
-//     users: { [process.env.DASHBOARD_USER]: process.env.DASHBOARD_PASS },
-//     challenge: true,
-//   }));
-// } else {
-//   console.log('Basic auth not enabled');
-// }
 
 app.use(cors());
 app.use(express.json());
 
-// Serve static files from public folder
 app.use(express.static(path.join(__dirname, 'public')));
 
-// API endpoints
 app.get('/api/state', (req, res) => {
   try {
     const statePath = path.join(__dirname, '..', 'stream_state.json');
@@ -98,10 +81,9 @@ app.get('/api/log-dates', (req, res) => {
     const logFiles = files.filter(file => file.startsWith('wolf_tcg_log_') && file.endsWith('.txt'));
 
     const dates = logFiles.map(file => {
-      // Extract date from filename: wolf_tcg_log_2025-12-19.txt -> 2025-12-19
       const dateMatch = file.match(/wolf_tcg_log_(\d{4}-\d{2}-\d{2})\.txt/);
       return dateMatch ? dateMatch[1] : null;
-    }).filter(date => date).sort().reverse(); // Sort by date descending (newest first)
+    }).filter(date => date).sort().reverse(); 
 
     res.json({ dates });
   } catch (err) {
@@ -131,7 +113,7 @@ app.get('/api/summary', (req, res) => {
       liveStreams: liveCount,
       totalUsers,
       requestCount: requests.count,
-      requestLimit: 1000, // hardcoded from bot
+      requestLimit: 1000, 
       date: requests.date
     });
   } catch (err) {
@@ -147,7 +129,6 @@ app.get('/api/live-history', (req, res) => {
     if (fs.existsSync(statePath)) {
       state = JSON.parse(fs.readFileSync(statePath, 'utf8'));
     }
-    // Return last 20 entries, sorted by startTime descending
     const history = (state.liveHistory || [])
       .sort((a, b) => b.startTime - a.startTime)
       .slice(0, 20);
@@ -170,7 +151,6 @@ app.get('/api/tiktok-users', (req, res) => {
       .map((u) => u.trim())
       .filter((u) => u);
 
-    // Add last stream info for each user
     const usersWithInfo = tikTokUsers.map(user => {
       const isLive = state.liveStatus?.[user] || false;
       const lastStream = (state.liveHistory || [])
@@ -209,21 +189,18 @@ app.get('/api/stats', (req, res) => {
     const now = Date.now();
     const todayStart = new Date().setHours(0, 0, 0, 0);
     
-    // Filter today's streams
     const todayStreams = (state.liveHistory || []).filter(entry => 
       entry.startTime >= todayStart
     );
 
-    // Calculate stats
     const streamsToday = todayStreams.length;
     const totalStreamTime = todayStreams.reduce((sum, entry) => {
       const duration = entry.endTime ? (entry.endTime - entry.startTime) : (now - entry.startTime);
-      return sum + duration / 1000; // in seconds
+      return sum + duration / 1000; 
     }, 0);
 
     const avgStreamDuration = streamsToday > 0 ? totalStreamTime / streamsToday : 0;
-
-    // Find most active streamer
+r
     const streamerCounts = {};
     todayStreams.forEach(entry => {
       streamerCounts[entry.userId] = (streamerCounts[entry.userId] || 0) + 1;
@@ -231,7 +208,6 @@ app.get('/api/stats', (req, res) => {
     const mostActive = Object.entries(streamerCounts)
       .sort((a, b) => b[1] - a[1])[0];
 
-    // Recent live alerts (last 5 minutes)
     const recentThreshold = now - (5 * 60 * 1000);
     const recentLive = Object.entries(state.liveStatus || {})
       .filter(([userId, isLive]) => {
@@ -267,8 +243,6 @@ app.get('/api/system', (req, res) => {
     const freeMem = os.freemem();
     const usedMem = totalMem - freeMem;
     const memUsagePercent = Math.round((usedMem / totalMem) * 100);
-
-    // CPU usage calculation (measures over time interval for accuracy)
     const cpus = os.cpus();
     const currentTime = Date.now();
 
@@ -291,16 +265,13 @@ app.get('/api/system', (req, res) => {
 
       if (tickDiff > 0) {
         cpuUsagePercent = Math.round(100 - ~~(100 * idleDiff / tickDiff));
-        // Ensure percentage is between 0 and 100
         cpuUsagePercent = Math.max(0, Math.min(100, cpuUsagePercent));
       }
     } else {
-      // First measurement - show current load average as fallback
       cpuUsagePercent = Math.round(os.loadavg()[0] * 100 / cpus.length);
       cpuUsagePercent = Math.max(0, Math.min(100, cpuUsagePercent));
     }
 
-    // Store current measurements for next calculation
     previousCpuTimes = { idle: totalIdle, total: totalTick };
     previousMeasurementTime = currentTime;
 
@@ -328,11 +299,27 @@ app.get('/api/system', (req, res) => {
   }
 });
 
-// Catch-all handler: send back index.html for client-side routing
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-app.listen(PORT, () => {
-  console.log(`Dashboard server running on http://localhost:${PORT}`);
+app.listen(PORT, '0.0.0.0', () => {
+  const networkInterfaces = os.networkInterfaces();
+  const addresses = [];
+  
+  Object.keys(networkInterfaces).forEach((key) => {
+    networkInterfaces[key].forEach((details) => {
+      if (details.family === 'IPv4' && !details.internal) {
+        addresses.push(details.address);
+      }
+    });
+  });
+
+  console.log(`\n🐺 Dashboard server is running!`);
+  console.log(`\n📱 Access from your devices:`);
+  console.log(`   Local:    http://localhost:${PORT}`);
+  addresses.forEach(addr => {
+    console.log(`   Network:  http://${addr}:${PORT}`);
+  });
+  console.log(`\n💡 Use the Network address to connect from your phone\n`);
 });

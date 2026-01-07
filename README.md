@@ -140,7 +140,7 @@ The bot DMs you with important alerts and status updates.
 
 ### Common Issues
 
-**Bot doesn't respond to commands:**
+**Bot does't send any messages:**
 - Ensure the bot has been invited to your server with the correct permissions.
 - Check that `ALERT_CHANNEL_ID` is correct and the bot can send messages there.
 

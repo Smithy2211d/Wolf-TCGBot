@@ -52,6 +52,30 @@ if (tikTokUsers.length === 0) {
 const logsDir = path.join(__dirname, "logs");
 if (!existsSync(logsDir)) fs.mkdirSync(logsDir);
 
+function cleanupOldLogs() {
+  try {
+    const files = fs.readdirSync(logsDir);
+    const now = Date.now();
+    const threeDaysAgo = now - (3 * 24 * 60 * 60 * 1000);
+
+    files.forEach(file => {
+      if (file.startsWith('wolf_tcg_log_') && file.endsWith('.txt')) {
+        const filePath = path.join(logsDir, file);
+        const stats = fs.statSync(filePath);
+        
+        if (stats.mtimeMs < threeDaysAgo) {
+          fs.unlinkSync(filePath);
+          console.log(chalk.gray(`🗑️ Deleted old log file: ${file}`));
+        }
+      }
+    });
+  } catch (err) {
+    console.error(chalk.red(`⚠️ Error cleaning up old logs: ${err.message}`));
+  }
+}
+
+cleanupOldLogs();
+
 let currentLogDate = new Date().toISOString().slice(0, 10);
 let logPath = path.join(logsDir, `wolf_tcg_log_${currentLogDate}.txt`);
 
@@ -299,7 +323,7 @@ function connectEulerWSForUser(username) {
   const reconnectDelay = 90 * 1000;
 
   ws.on("open", async () => {
-    logEvent(`🟢 Connected to EulerStream for ${username}`, "green");
+    logEvent(`🟢 Connected to EulerStream for ${username} | API: ${requestState.count}/${REQUEST_LIMIT}`, "green");
   });
 
   ws.on("message", async (raw) => {
@@ -321,7 +345,11 @@ function connectEulerWSForUser(username) {
       const now = Date.now();
       const wasLive = !!liveStatus[userId];
 
-      if (room.isLive) {
+      if (room.isLive || !wasLive) {
+        const previousAttempts = failedReconnects[username] || 0;
+        if (previousAttempts > 0) {
+          logEvent(`✅ [${username}] Connection restored — reset counter (was ${previousAttempts}/${MAX_RECONNECT_ATTEMPTS})`, "green");
+        }
         failedReconnects[username] = 0;
       }
 
@@ -330,9 +358,9 @@ function connectEulerWSForUser(username) {
         const detectedMs = now - streamStart;
 
         if (detectedMs <= 30 * 1000) {
-          logEvent(`⚡ [${username}] Detected live within 30 seconds — resetting counter.`, "green");
+          logEvent(`⚡ [${username}] Detected live within 30 seconds`, "green");
         } else {
-          logEvent(`🔴 [${username}] Detected live after ${Math.round(detectedMs / 1000)} seconds — resetting counter.`, "green");
+          logEvent(`🔴 [${username}] Detected live after ${Math.round(detectedMs / 1000)} seconds`, "green");
         }
 
         liveStatus[userId] = true;
@@ -399,15 +427,27 @@ function connectEulerWSForUser(username) {
   });
 
   ws.on("close", async (code, reason) => {
-    failedReconnects[username] = (failedReconnects[username] || 0) + 1;
-    const attempt = failedReconnects[username];
+    const wasLive = !!liveStatus[username];
+    
+    if (wasLive) {
+      failedReconnects[username] = (failedReconnects[username] || 0) + 1;
+      const attempt = failedReconnects[username];
+      
+      logEvent(
+        `🔴 [${username}] WS closed (code ${code}) | Offline check attempt ${attempt}/${MAX_RECONNECT_ATTEMPTS} | API: ${requestState.count}/${REQUEST_LIMIT} | ${reason?.toString() || "No reason"}`,
+        "yellow"
+      );
+    } else {
+      const currentAttempts = failedReconnects[username] || 0;
+      logEvent(
+        `🔴 [${username}] WS closed (code ${code}) | Live check (${currentAttempts} offline attempts stored) | API: ${requestState.count}/${REQUEST_LIMIT} | Reconnecting in 90s`,
+        "gray"
+      );
+    }
 
-    logEvent(
-      `🔴 [${username}] WS closed (code ${code}) attempt ${attempt}/${MAX_RECONNECT_ATTEMPTS} — ${reason?.toString() || "No reason"}`,
-      "yellow"
-    );
+    const attempt = failedReconnects[username] || 0;
 
-    if (attempt >= MAX_RECONNECT_ATTEMPTS && liveStatus[username]) {
+    if (attempt >= MAX_RECONNECT_ATTEMPTS && wasLive) {
       try {
         const now = Date.now();
         const cachedUser = userCache[username] || { uniqueId: username };

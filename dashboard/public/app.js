@@ -10,11 +10,9 @@ async function fetchText(endpoint) {
   return response.text();
 }
 
-// Store historical system data
 let systemHistory = [];
 const MAX_HISTORY_POINTS = 150;
 
-// Initialize with empty data point to ensure chart is created
 systemHistory.push({
   time: new Date().toLocaleTimeString('en-US', {
     hour12: false,
@@ -33,7 +31,6 @@ async function loadSummary() {
     document.getElementById('total-users').textContent = summary.totalUsers;
     document.getElementById('request-count').textContent = summary.requestCount;
 
-    // Update or create chart
     if (window.requestChart) {
       window.requestChart.data.datasets[0].data = [summary.requestCount, summary.requestLimit - summary.requestCount];
       window.requestChart.update();
@@ -77,7 +74,6 @@ async function loadStats() {
     document.getElementById('most-active').textContent = stats.mostActiveStreamer ? 
       `${stats.mostActiveStreamer.userId} (${stats.mostActiveStreamer.count})` : '-';
 
-    // Update live alerts
     const alertsDiv = document.getElementById('live-alerts');
     if (stats.recentLive && stats.recentLive.length > 0) {
       alertsDiv.innerHTML = stats.recentLive.map(stream => {
@@ -265,7 +261,6 @@ async function loadSystemInfo() {
     document.getElementById('mem-usage').textContent = `${sys.memory.usagePercent}%`;
     document.getElementById('uptime').textContent = formatUptime(sys.uptime);
 
-    // Store historical data
     const timestamp = new Date().toLocaleTimeString('en-US', {
       hour12: false,
       hour: '2-digit',
@@ -278,12 +273,10 @@ async function loadSystemInfo() {
       memory: sys.memory.usagePercent
     });
 
-    // Keep only last MAX_HISTORY_POINTS
     if (systemHistory.length > MAX_HISTORY_POINTS) {
       systemHistory.shift();
     }
 
-    // Update or create system chart
     updateSystemChart();
 
   } catch (err) {
@@ -295,7 +288,6 @@ function updateSystemChart() {
   const ctx = document.getElementById('system-chart').getContext('2d');
 
   if (window.systemChart) {
-    // Update existing chart data smoothly
     const labels = systemHistory.map(d => d.time);
     const cpuData = systemHistory.map(d => d.cpu);
     const memData = systemHistory.map(d => d.memory);
@@ -303,9 +295,9 @@ function updateSystemChart() {
     window.systemChart.data.labels = labels;
     window.systemChart.data.datasets[0].data = cpuData;
     window.systemChart.data.datasets[1].data = memData;
-    window.systemChart.update('none'); // Update without animation for smooth real-time feel
+    window.systemChart.update('none'); 
   } else {
-    // Create new chart if it doesn't exist
+
     const labels = systemHistory.map(d => d.time);
     const cpuData = systemHistory.map(d => d.cpu);
     const memData = systemHistory.map(d => d.memory);
@@ -344,7 +336,7 @@ function updateSystemChart() {
       options: {
         responsive: true,
         animation: {
-          duration: 0 // Disable animations for real-time feel
+          duration: 0 
         },
         scales: {
           y: {
@@ -399,11 +391,9 @@ function formatBytes(bytes) {
   return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i];
 }
 
-// Auto-refresh every 2 seconds for real-time updates
 let autoRefreshInterval = null;
 
 function startAutoRefresh(interval = 2000) {
-  // Clear existing interval if any
   if (autoRefreshInterval) {
     clearInterval(autoRefreshInterval);
   }
@@ -421,7 +411,6 @@ function changeUpdateInterval() {
   const select = document.getElementById('update-interval');
   const interval = parseInt(select.value);
 
-  // Reset system history for fresh data at new interval
   systemHistory = [];
   systemHistory.push({
     time: new Date().toLocaleTimeString('en-US', {
@@ -433,15 +422,11 @@ function changeUpdateInterval() {
     cpu: 0,
     memory: 0
   });
-
-  // Update the chart with reset data
   updateSystemChart();
 
-  // Start auto-refresh with new interval
   startAutoRefresh(interval);
 }
 
-// Initialize
 document.addEventListener('DOMContentLoaded', () => {
   loadSummary();
   loadStats();
@@ -450,13 +435,10 @@ document.addEventListener('DOMContentLoaded', () => {
   loadTikTokUsers();
   loadLogDates();
   loadSystemInfo();
-  // Create system chart immediately
   updateSystemChart();
   startAutoRefresh();
 
-  // Add event listener for interval change
   document.getElementById('update-interval').addEventListener('change', changeUpdateInterval);
 
-  // Add event listener for log date selection
   document.getElementById('log-date').addEventListener('change', loadLogs);
 });
