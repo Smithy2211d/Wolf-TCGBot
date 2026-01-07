@@ -120,21 +120,20 @@ The dashboard exposes several API endpoints for external integration:
 ### Live Notification Embed
 Automatically detects when a user goes live and sends a rich embed to your channel.
 
-<img width="486" height="689" alt="Live Embed" src="https://github.com/user-attachments/assets/ad185586-49b0-4967-ab0f-13fa484aa911" />
+<img width="533" height="691" alt="image" src="https://github.com/user-attachments/assets/7978aa0e-2995-4cdf-84cf-fe4c7e2b4a7c" />
+
 
 ### Stream Ended Embed
 Updates automatically after failed connection attempts.
 
-<img width="448" height="620" alt="Offline Embed" src="https://github.com/user-attachments/assets/a7436fc7-99a9-4b74-ac1e-852d29d39ad8" />
+<img width="395" height="611" alt="image" src="https://github.com/user-attachments/assets/141e12d0-c22b-4828-917f-3fd12c29f56c" />
+
 
 ### Owner DM Notifications
 The bot DMs you with important alerts and status updates.
 
-<img width="434" height="154" alt="DM Alert 1" src="https://github.com/user-attachments/assets/44b88f10-a4e7-4284-8a2f-7802c88d2e0b" />
+<img width="533" height="465" alt="image" src="https://github.com/user-attachments/assets/920d4382-5bb4-4471-8610-8314ba2a906e" />
 
-<img width="315" height="159" alt="DM Alert 2" src="https://github.com/user-attachments/assets/1435db3b-b3d4-4ee8-934d-344d230e8e1d" />
-
-<img width="445" height="143" alt="DM Alert 3" src="https://github.com/user-attachments/assets/58b1ad26-d028-43b0-826b-4c7f85f81719" />
 
 ## 🔧 Troubleshooting
 
