@@ -200,7 +200,7 @@ app.get('/api/stats', (req, res) => {
     }, 0);
 
     const avgStreamDuration = streamsToday > 0 ? totalStreamTime / streamsToday : 0;
-r
+
     const streamerCounts = {};
     todayStreams.forEach(entry => {
       streamerCounts[entry.userId] = (streamerCounts[entry.userId] || 0) + 1;

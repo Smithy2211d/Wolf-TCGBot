@@ -1,16 +1,19 @@
 # 🐺 Wolf TCG Discord Bot
 
-A sophisticated Discord bot that monitors Twitch streams using the Euler API Free Plan. It automatically detects when specified users go live or offline, sending rich embed notifications to a designated Discord channel. Includes a web dashboard for real-time monitoring and management.
+A sophisticated Discord bot that monitors TikTok streams using the Euler API Free Plan. It automatically detects when specified users go live or offline, sending rich embed notifications to a designated Discord channel. Includes a web dashboard for real-time monitoring and management.
 
 ## ✨ Features
 
 - **Live Stream Monitoring**: Automatically checks stream status every 90 seconds to stay under the 1000 daily API request limit.
+- **Smart Offline Detection**: Only counts reconnection attempts (max 4) when verifying if a live user went offline, unlimited checks when monitoring for users going live.
 - **Rich Embeds**: Sends beautifully formatted Discord embeds for live notifications and stream end alerts.
 - **Owner Notifications**: Direct messages the bot owner with important updates, warnings, and alerts.
 - **Rate Limiting**: Built-in API request tracking with warnings at 900 requests and hard stop at 1000.
 - **Persistent State**: Remembers sent messages, stream start times, and user data across restarts.
-- **Web Dashboard**: Comprehensive monitoring interface with live stats, logs, and charts.
-- **Logging**: Detailed event logging with daily log files.
+- **Web Dashboard**: Comprehensive monitoring interface with live stats, logs, and charts - accessible from any device on your network.
+- **Automatic Log Cleanup**: Automatically deletes log files older than 3 days to save disk space.
+- **Enhanced Logging**: Detailed event logging with daily log files, includes API request counter in all log messages.
+- **Testing Tools**: Built-in alert testing system to verify all notifications work correctly.
 - **Error Handling**: Robust reconnection logic and graceful failure handling.
 
 ## 📋 Prerequisites
@@ -68,7 +71,7 @@ DASHBOARD_PASS=your_secure_password
 - **EULER_API_KEY**: Sign up at [Euler Stream](https://www.eulerstream.com/) and get your free API key.
 - **ALERT_CHANNEL_ID**: Right-click a channel in Discord → Copy ID (requires Developer Mode enabled).
 - **OWNER_ID**: Right-click your username in Discord → Copy ID.
-- **TIKTOK_USERS**: Comma-separated list of Twitch usernames to monitor.
+- **TIKTOK_USERS**: Comma-separated list of TikTok usernames to monitor.
 
 ## 🎮 Running the Bot
 
@@ -79,6 +82,9 @@ npm start
 
 # Development mode (with auto-restart)
 npm run dev
+
+# Test all alerts and notifications
+npm run test-alerts
 ```
 
 ### Web Dashboard
@@ -87,7 +93,11 @@ npm run dev
 npm run dashboard
 ```
 
-Then open `http://localhost:3000` in your browser.
+Then access from:
+- **Local computer**: `http://localhost:3000`
+- **Phone/Tablet** (same network): `http://[your-computer-ip]:3000`
+
+The dashboard will display all available network addresses when it starts.
 
 ## 🖥️ Web Dashboard
 
@@ -102,6 +112,33 @@ The included web dashboard provides real-time monitoring and management:
 
 ### Security
 The dashboard supports basic authentication. Set `DASHBOARD_USER` and `DASHBOARD_PASS` in your `.env` file for access control.
+
+### Mobile/Network Access
+To access the dashboard from your phone or other devices:
+1. Ensure your device is on the **same WiFi network** as the computer running the bot
+2. Start the dashboard (`npm run dashboard`)
+3. Note the network IP addresses shown in the console
+4. Open your device's browser and navigate to `http://[network-ip]:3000`
+
+**Windows Firewall**: You may need to allow port 3000 through Windows Firewall for network access.
+
+## 🧪 Testing
+
+Test all bot alerts and notifications without waiting for live streams:
+
+```bash
+npm run test-alerts
+```
+
+This will send test versions of:
+- Live stream alerts to your Discord channel
+- Offline stream alerts to your Discord channel
+- Bot startup DM to owner
+- Live notification DM to owner
+- API warning DM to owner
+- Connection issue DM to owner
+
+All test messages are clearly marked as "TEST MODE".
 
 ## 🔌 API Endpoints
 
@@ -139,9 +176,10 @@ The bot DMs you with important alerts and status updates.
 
 ### Common Issues
 
-**Bot does't send any messages:**
+**Bot doesn't send any messages:**
 - Ensure the bot has been invited to your server with the correct permissions.
 - Check that `ALERT_CHANNEL_ID` is correct and the bot can send messages there.
+- Run `npm run test-alerts` to verify notifications are working.
 
 **API request limit reached:**
 - The bot automatically stops making requests after 1000/day.
@@ -153,13 +191,18 @@ The bot DMs you with important alerts and status updates.
 - Check `DASHBOARD_PORT` in `.env` (default: 3000).
 - Verify firewall/antivirus isn't blocking the port.
 
+**Can't access dashboard from phone:**
+- Ensure your phone is on the same WiFi network.
+- Add firewall rule to allow port 3000 (Windows Firewall → Advanced Settings → Inbound Rules → New Rule → Port → TCP 3000).
+- Use the network IP address shown in console, not `localhost`.
+
 **Connection errors:**
 - Check your internet connection.
 - Verify Euler API key is valid and active.
 - Review logs for specific error messages.
 
 ### Logs
-All events are logged to daily files in the `logs/` directory. Check these for detailed error information.
+All events are logged to daily files in the `logs/` directory. Log files older than 3 days are automatically deleted. Check these for detailed error information.
 
 ## 📄 License
 

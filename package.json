@@ -18,7 +18,8 @@
   "scripts": {
     "start": "node index.js",
     "dashboard": "node dashboard/server.js",
-    "dev": "nodemon index.js"
+    "dev": "nodemon index.js",
+    "test-alerts": "node test-alerts.js"
   },
   "keywords": [],
   "author": "",
