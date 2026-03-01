@@ -122,7 +122,8 @@ To access the dashboard from your phone or other devices:
 1. Ensure your device is on the **same WiFi network** as the computer running the bot
 2. Start the dashboard (`npm run dashboard`)
 3. Note the network IP addresses shown in the console
-4. Open your device's browser and navigate to `http://[network-ip]:3000`
+### Dashboard removed
+The previous web dashboard has been removed from the repository. Monitoring and troubleshooting should be done via logs and the `stream_state.json` / `request_counter.json` files.
 
 **Windows Firewall**: You may need to allow port 3000 through Windows Firewall for network access.
 
@@ -155,15 +156,7 @@ The dashboard exposes several API endpoints for external integration:
 - `GET /api/log-dates` - Available log file dates
 - `GET /api/system` - System performance metrics
 - `GET /api/tiktok-users` - List of monitored users
-
-## 📸 Screenshots
-
-### Live Notification Embed
-Automatically detects when a user goes live and sends a rich embed to your channel.
-
-<img width="533" height="691" alt="image" src="https://github.com/user-attachments/assets/7978aa0e-2995-4cdf-84cf-fe4c7e2b4a7c" />
-
-
+(Dashboard troubleshooting removed — use logs/state files instead.)
 ### Stream Ended Embed
 Updates automatically after failed connection attempts.
 
