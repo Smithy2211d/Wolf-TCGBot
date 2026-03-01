@@ -14,7 +14,6 @@ A sophisticated Discord bot that monitors TikTok streams using the Euler API Fre
 - **Owner Notifications**: Direct messages the bot owner with important updates, warnings, and alerts.
 - **Rate Limiting**: Built-in API request tracking with warnings at 900 requests and hard stop at 1000.
 - **Persistent State**: Remembers sent messages, stream start times, and user data across restarts.
-- **Web Dashboard**: Comprehensive monitoring interface with live stats, logs, and charts - accessible from any device on your network.
 - **Automatic Log Cleanup**: Automatically deletes log files older than 3 days to save disk space.
 - **Enhanced Logging**: Detailed event logging with daily log files, includes API request counter in all log messages.
 - **Testing Tools**: Built-in alert testing system to verify all notifications work correctly.
@@ -64,9 +63,6 @@ TIKTOK_USERS=username1,username2,username3
 # Optional
 DEBUG_LOGS=true
 MAX_RECONNECT_ATTEMPTS=4
-DASHBOARD_PORT=3000
-DASHBOARD_USER=admin
-DASHBOARD_PASS=your_secure_password
 ```
 
 ### Getting Your Tokens and IDs
@@ -90,18 +86,6 @@ npm run dev
 # Test all alerts and notifications
 npm run test-alerts
 ```
-
-### Web Dashboard
-```bash
-# Start the dashboard server
-npm run dashboard
-```
-
-Then access from:
-- **Local computer**: `http://localhost:3000`
-- **Phone/Tablet** (same network): `http://[your-computer-ip]:3000`
-
-The dashboard will display all available network addresses when it starts.
 
 ## 🧪 Testing
 
@@ -158,16 +142,6 @@ The bot DMs you with important alerts and status updates.
 - The bot automatically stops making requests after 1000/day.
 - Limits reset at 00:00 UTC.
 - Monitor usage via the dashboard or logs.
-
-**Dashboard not loading:**
-- Ensure the dashboard server is running (`npm run dashboard`).
-- Check `DASHBOARD_PORT` in `.env` (default: 3000).
-- Verify firewall/antivirus isn't blocking the port.
-
-**Can't access dashboard from phone:**
-- Ensure your phone is on the same WiFi network.
-- Add firewall rule to allow port 3000 (Windows Firewall → Advanced Settings → Inbound Rules → New Rule → Port → TCP 3000).
-- Use the network IP address shown in console, not `localhost`.
 
 **Connection errors:**
 - Check your internet connection.
