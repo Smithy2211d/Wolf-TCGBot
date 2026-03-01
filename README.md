@@ -224,3 +224,74 @@ If you encounter issues:
 3. Ensure all prerequisites are met
 4. Open an issue with relevant log excerpts
 
+## 🔁 Changes & Deployment (updated 2026-03-01)
+
+Recent repo changes:
+- Removed Docker artifacts (`Dockerfile`, `docker-compose.yml`, `.dockerignore`) to focus on running the bot directly in a host/container environment.
+- Restored file-based logging in the application while adding a safe fallback to console-only logging if file writes fail.
+
+If you're running the bot inside a Debian container on Proxmox (recommended):
+
+1. Install Node.js and dependencies:
+```bash
+apt update
+apt install -y curl build-essential
+curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+apt install -y nodejs
+cd /opt/wolf-bot   # or wherever you placed the repo
+npm ci
+```
+
+2. Secure your environment file and create state files:
+```bash
+chmod 600 /opt/wolf-bot/.env
+touch /opt/wolf-bot/stream_state.json /opt/wolf-bot/request_counter.json
+chmod 664 /opt/wolf-bot/*.json
+```
+
+3. Run the bot (foreground):
+```bash
+npm start
+```
+
+4. Run the bot with `pm2` (recommended for production):
+```bash
+npm install -g pm2
+pm2 start index.js --name WolfTCG
+pm2 logs WolfTCG
+pm2 save
+pm2 startup systemd  # follow the printed instructions
+```
+
+Systemd unit example (alternative to pm2):
+```ini
+[Unit]
+Description=WolfTCG Bot
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/wolf-bot
+ExecStart=/usr/bin/node /opt/wolf-bot/index.js
+Restart=always
+EnvironmentFile=/opt/wolf-bot/.env
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Logging notes:
+- The app writes daily log files to `logs/` by default. If file writes are not possible (permissions, missing folder), the bot falls back to console logging and continues running.
+- To store logs on the host, ensure `logs/` exists and is writable by the running user.
+
+Security reminder:
+- Treat `.env` as sensitive. Rotate your Discord token or Euler API key immediately if they were ever exposed.
+
+Prepare and push to GitHub (local machine):
+```bash
+git add -A
+git commit -m "Remove Docker artifacts; restore file logging; update README"
+git push origin main   # or the branch you use
+```
+

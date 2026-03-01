@@ -49,41 +49,49 @@ if (tikTokUsers.length === 0) {
   process.exit(1);
 }
 
+// File-based logging (with safe fallback to console-only if file ops fail)
 const logsDir = path.join(__dirname, "logs");
-if (!existsSync(logsDir)) fs.mkdirSync(logsDir);
+let fileLoggingEnabled = false;
+let logPath = null;
 
 function cleanupOldLogs() {
   try {
+    if (!existsSync(logsDir)) return;
     const files = fs.readdirSync(logsDir);
     const now = Date.now();
-    const threeDaysAgo = now - (3 * 24 * 60 * 60 * 1000);
-
-    files.forEach(file => {
-      if (file.startsWith('wolf_tcg_log_') && file.endsWith('.txt')) {
+    const threeDaysAgo = now - 3 * 24 * 60 * 60 * 1000;
+    files.forEach((file) => {
+      if (file.startsWith("wolf_tcg_log_") && file.endsWith(".txt")) {
         const filePath = path.join(logsDir, file);
-        const stats = fs.statSync(filePath);
-        
-        if (stats.mtimeMs < threeDaysAgo) {
-          fs.unlinkSync(filePath);
-          console.log(chalk.gray(`🗑️ Deleted old log file: ${file}`));
+        try {
+          const stats = fs.statSync(filePath);
+          if (stats.mtimeMs < threeDaysAgo) {
+            fs.unlinkSync(filePath);
+            console.log(chalk.gray(`🗑️ Deleted old log file: ${file}`));
+          }
+        } catch (err) {
+          // ignore per-file errors
         }
       }
     });
   } catch (err) {
-    console.error(chalk.red(`⚠️ Error cleaning up old logs: ${err.message}`));
+    console.warn(chalk.yellow(`⚠️ Error during log cleanup: ${err.message}`));
   }
 }
 
-cleanupOldLogs();
-
-let currentLogDate = new Date().toISOString().slice(0, 10);
-let logPath = path.join(logsDir, `wolf_tcg_log_${currentLogDate}.txt`);
-
-if (!existsSync(logPath)) {
-  const header = `──────────────────────────────
-🐺 Wolf TCG Bot Log — ${currentLogDate}
-──────────────────────────────\n`;
-  fs.writeFileSync(logPath, header, "utf8");
+try {
+  if (!existsSync(logsDir)) fs.mkdirSync(logsDir, { recursive: true });
+  cleanupOldLogs();
+  const currentLogDate = new Date().toISOString().slice(0, 10);
+  logPath = path.join(logsDir, `wolf_tcg_log_${currentLogDate}.txt`);
+  if (!existsSync(logPath)) {
+    const header = `──────────────────────────────\n🐺 Wolf TCG Bot Log — ${currentLogDate}\n──────────────────────────────\n`;
+    fs.writeFileSync(logPath, header, "utf8");
+  }
+  fileLoggingEnabled = true;
+} catch (err) {
+  fileLoggingEnabled = false;
+  console.warn(chalk.yellow(`⚠️ File logging disabled: ${err.message}`));
 }
 
 function logEvent(message, color = "white", force = false) {
@@ -100,8 +108,16 @@ function logEvent(message, color = "white", force = false) {
     gray: chalk.gray,
     white: chalk.white,
   };
-  console.log(colorMap[color] ? colorMap[color](message) : message);
-  fs.appendFileSync(logPath, `[${timestamp}] ${message}\n`, "utf8");
+  const out = `[${timestamp}] ${message}`;
+  console.log(colorMap[color] ? colorMap[color](out) : out);
+
+  if (!fileLoggingEnabled || !logPath) return;
+  try {
+    fs.appendFileSync(logPath, `[${timestamp}] ${message}\n`, "utf8");
+  } catch (err) {
+    fileLoggingEnabled = false;
+    console.warn(chalk.yellow(`⚠️ Disabling file logging: ${err.message}`));
+  }
 }
 
 const REQUEST_LIMIT = 1000;
