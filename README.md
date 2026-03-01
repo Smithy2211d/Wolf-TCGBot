@@ -103,30 +103,6 @@ Then access from:
 
 The dashboard will display all available network addresses when it starts.
 
-## 🖥️ Web Dashboard
-
-The included web dashboard provides real-time monitoring and management:
-
-### Features
-- **Summary Panel**: Live stream count, total monitored users, and daily API usage
-- **Live Streams List**: Currently active streams with titles and durations
-- **Request Usage Chart**: Visual representation of API requests used vs remaining
-- **Log Viewer**: Browse and view log files by date
-- **System Information**: CPU usage, memory stats, and uptime
-
-### Security
-The dashboard supports basic authentication. Set `DASHBOARD_USER` and `DASHBOARD_PASS` in your `.env` file for access control.
-
-### Mobile/Network Access
-To access the dashboard from your phone or other devices:
-1. Ensure your device is on the **same WiFi network** as the computer running the bot
-2. Start the dashboard (`npm run dashboard`)
-3. Note the network IP addresses shown in the console
-### Dashboard removed
-The previous web dashboard has been removed from the repository. Monitoring and troubleshooting should be done via logs and the `stream_state.json` / `request_counter.json` files.
-
-**Windows Firewall**: You may need to allow port 3000 through Windows Firewall for network access.
-
 ## 🧪 Testing
 
 Test all bot alerts and notifications without waiting for live streams:
