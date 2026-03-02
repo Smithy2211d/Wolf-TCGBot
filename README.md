@@ -224,17 +224,4 @@ EnvironmentFile=/opt/wolf-bot/.env
 WantedBy=multi-user.target
 ```
 
-Logging notes:
-- The app writes daily log files to `logs/` by default. If file writes are not possible (permissions, missing folder), the bot falls back to console logging and continues running.
-- To store logs on the host, ensure `logs/` exists and is writable by the running user.
-
-Security reminder:
-- Treat `.env` as sensitive. Rotate your Discord token or Euler API key immediately if they were ever exposed.
-
-Prepare and push to GitHub (local machine):
-```bash
-git add -A
-git commit -m "Remove Docker artifacts; restore file logging; update README"
-git push origin main   # or the branch you use
-```
 
