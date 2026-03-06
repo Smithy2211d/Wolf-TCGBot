@@ -182,32 +182,11 @@ let persistentState = {
   liveStatus: {}, 
   userCache: {}, 
   titleCache: {}, 
-  liveHistory: [],
-  analytics: {
-    totalStreams: 0,
-    totalStreamTime: 0,
-    streamsByDay: {},
-    streamsByHour: {},
-    averageDuration: 0,
-    longestStream: { duration: 0, userId: null, date: null },
-    mostActiveStreamer: { userId: null, count: 0 }
-  }
+  liveHistory: []
 };
 if (existsSync(stateFile)) {
   try {
     persistentState = JSON.parse(readFileSync(stateFile, "utf8"));
-    // Initialize analytics if missing
-    if (!persistentState.analytics) {
-      persistentState.analytics = {
-        totalStreams: 0,
-        totalStreamTime: 0,
-        streamsByDay: {},
-        streamsByHour: {},
-        averageDuration: 0,
-        longestStream: { duration: 0, userId: null, date: null },
-        mostActiveStreamer: { userId: null, count: 0 }
-      };
-    }
     logEvent("💾 Loaded previous stream state.", "gray");
   } catch {
     logEvent("⚠️ Failed to load stream_state.json, starting fresh.", "yellow");
@@ -219,48 +198,9 @@ const liveStatus = persistentState.liveStatus;
 const userCache = persistentState.userCache || {};
 const titleCache = persistentState.titleCache || {};
 const liveHistory = persistentState.liveHistory || [];
-const analytics = persistentState.analytics;
 
 function saveState() {
   writeFileSync(stateFile, JSON.stringify(persistentState, null, 2), "utf8");
-}
-
-function updateAnalytics(userId, startMs, endMs) {
-  const duration = endMs - startMs;
-  const startDate = new Date(startMs);
-  const dayOfWeek = startDate.toLocaleDateString('en-US', { weekday: 'long' });
-  const hour = startDate.getHours();
-
-  // Update totals
-  analytics.totalStreams++;
-  analytics.totalStreamTime += duration;
-  analytics.averageDuration = analytics.totalStreamTime / analytics.totalStreams;
-
-  // Track by day of week
-  analytics.streamsByDay[dayOfWeek] = (analytics.streamsByDay[dayOfWeek] || 0) + 1;
-
-  // Track by hour
-  analytics.streamsByHour[hour] = (analytics.streamsByHour[hour] || 0) + 1;
-
-  // Check for longest stream
-  if (duration > analytics.longestStream.duration) {
-    analytics.longestStream = {
-      duration,
-      userId,
-      date: startDate.toISOString()
-    };
-  }
-
-  // Update most active streamer
-  const userStreamCount = liveHistory.filter(h => h.userId === userId && h.endTime).length;
-  if (userStreamCount > analytics.mostActiveStreamer.count) {
-    analytics.mostActiveStreamer = {
-      userId,
-      count: userStreamCount
-    };
-  }
-
-  saveState();
 }
 
 const client = new Client({
@@ -387,6 +327,8 @@ function liveActionRow(userId, isLive) {
 
 const userConnections = {};
 const failedReconnects = {};
+const lastLiveUpdate = {};
+const OFFLINE_TIMEOUT_MS = 2 * 60 * 1000;
 
 function connectEulerWSForUser(username) {
   resetRequestCounterIfNewDay();
@@ -434,6 +376,10 @@ function connectEulerWSForUser(username) {
           logEvent(`✅ [${username}] Connection restored — reset counter (was ${previousAttempts}/${MAX_RECONNECT_ATTEMPTS})`, "green");
         }
         failedReconnects[username] = 0;
+      }
+
+      if (room.isLive) {
+        lastLiveUpdate[userId] = now;
       }
 
       if (room.isLive && !wasLive) {
@@ -499,8 +445,6 @@ function connectEulerWSForUser(username) {
           const historyEntry = liveHistory.find(h => h.userId === userId && h.endTime === null);
           if (historyEntry) {
             historyEntry.endTime = now;
-            // Update analytics when stream ends
-            updateAnalytics(userId, startMs, now);
           }
           liveStatus[userId] = false;
           delete titleCache[userId];
@@ -568,8 +512,6 @@ function connectEulerWSForUser(username) {
         const historyEntry = liveHistory.find(h => h.userId === username && h.endTime === null);
         if (historyEntry) {
           historyEntry.endTime = now;
-          // Update analytics when stream ends due to failed reconnects
-          updateAnalytics(username, startMs, now);
         }
 
         liveStatus[username] = false;
@@ -600,6 +542,55 @@ client.once("ready", async () => {
     liveStatus[u] = false;
     connectEulerWSForUser(u);
   });
+
+  // Periodic offline check: if a user is marked live but hasn't received
+  // a live update in OFFLINE_TIMEOUT_MS, mark them offline.
+  setInterval(async () => {
+    const now = Date.now();
+    for (const userId of Object.keys(liveStatus)) {
+      if (!liveStatus[userId]) continue;
+      const last = lastLiveUpdate[userId] || 0;
+      if (now - last < OFFLINE_TIMEOUT_MS) continue;
+
+      logEvent(`🔵 [${userId}] No live update for ${OFFLINE_TIMEOUT_MS / 1000}s — marking offline.`, "yellow");
+      try {
+        const channel = await client.channels.fetch(alertChannelId);
+        const msgId = sentMessages[userId];
+        const startMs = streamStartTimes[userId] || now;
+        const embed = buildOfflineEmbed({
+          userId,
+          startMs,
+          endMs: now,
+          room: { title: titleCache[userId] },
+          user: userCache[userId] || { uniqueId: userId },
+        });
+        const oldMsg = msgId ? await channel.messages.fetch(msgId).catch(() => null) : null;
+        if (oldMsg) {
+          await oldMsg.edit({
+            content: `**${userId}'s stream has ended.**`,
+            embeds: [embed],
+            components: [liveActionRow(userId, false)],
+          });
+        } else {
+          await channel.send({
+            content: `**${userId}'s stream has ended.**`,
+            embeds: [embed],
+            components: [liveActionRow(userId, false)],
+          });
+        }
+        const historyEntry = liveHistory.find(h => h.userId === userId && h.endTime === null);
+        if (historyEntry) {
+          historyEntry.endTime = now;
+        }
+        liveStatus[userId] = false;
+        delete titleCache[userId];
+        delete lastLiveUpdate[userId];
+        saveState();
+      } catch (err) {
+        logEvent(`❌ [${userId}] Failed to send offline embed (timeout check): ${err.message}`, "red");
+      }
+    }
+  }, 30 * 1000);
 });
 
 client.login(process.env.DISCORD_TOKEN);

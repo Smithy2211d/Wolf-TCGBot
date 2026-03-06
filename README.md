@@ -4,7 +4,7 @@
 ![Node.js](https://img.shields.io/badge/node.js-16%2B-green.svg)
 ![Discord.js](https://img.shields.io/badge/discord.js-14.24.2-5865F2.svg)
 
-A sophisticated Discord bot that monitors TikTok streams using the Euler API Free Plan. It automatically detects when specified users go live or offline, sending rich embed notifications to a designated Discord channel. Includes a web dashboard for real-time monitoring and management.
+A sophisticated Discord bot that monitors TikTok streams using the Euler API Free Plan. It automatically detects when specified users go live or offline, sending rich embed notifications to a designated Discord channel.
 
 ## ✨ Features
 
@@ -105,18 +105,6 @@ This will send test versions of:
 
 All test messages are clearly marked as "TEST MODE".
 
-## 🔌 API Endpoints
-
-The dashboard exposes several API endpoints for external integration:
-
-- `GET /api/summary` - Bot summary statistics
-- `GET /api/state` - Complete stream state data
-- `GET /api/requests` - API request counter information
-- `GET /api/logs?date=YYYY-MM-DD` - Log content for specific date
-- `GET /api/log-dates` - Available log file dates
-- `GET /api/system` - System performance metrics
-- `GET /api/tiktok-users` - List of monitored users
-(Dashboard troubleshooting removed — use logs/state files instead.)
 ### Stream Ended Embed
 Updates automatically after failed connection attempts.
 
@@ -141,7 +129,7 @@ The bot DMs you with important alerts and status updates.
 **API request limit reached:**
 - The bot automatically stops making requests after 1000/day.
 - Limits reset at 00:00 UTC.
-- Monitor usage via the dashboard or logs.
+- Monitor usage via the bot logs.
 
 **Connection errors:**
 - Check your internet connection.
