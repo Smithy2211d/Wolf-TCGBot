@@ -49,7 +49,6 @@ if (tikTokUsers.length === 0) {
   process.exit(1);
 }
 
-// File-based logging (with safe fallback to console-only if file ops fail)
 const logsDir = path.join(__dirname, "logs");
 let fileLoggingEnabled = false;
 let logPath = null;
@@ -70,7 +69,6 @@ function cleanupOldLogs() {
             console.log(chalk.gray(`🗑️ Deleted old log file: ${file}`));
           }
         } catch (err) {
-          // ignore per-file errors
         }
       }
     });
@@ -199,7 +197,31 @@ const userCache = persistentState.userCache || {};
 const titleCache = persistentState.titleCache || {};
 const liveHistory = persistentState.liveHistory || [];
 
+{
+  const now = Date.now();
+  let orphansClosed = 0;
+  for (const entry of liveHistory) {
+    if (entry.endTime === null) {
+      entry.endTime = now;
+      orphansClosed++;
+    }
+  }
+  if (orphansClosed > 0) {
+    logEvent(`🔧 Closed ${orphansClosed} orphaned liveHistory entries from previous run.`, "yellow");
+  }
+}
+
+const MAX_HISTORY = 50;
+if (liveHistory.length > MAX_HISTORY) {
+  const removed = liveHistory.length - MAX_HISTORY;
+  liveHistory.splice(0, removed);
+  logEvent(`🗑️ Trimmed ${removed} old liveHistory entries (capped at ${MAX_HISTORY}).`, "gray");
+}
+
 function saveState() {
+  if (liveHistory.length > MAX_HISTORY) {
+    liveHistory.splice(0, liveHistory.length - MAX_HISTORY);
+  }
   writeFileSync(stateFile, JSON.stringify(persistentState, null, 2), "utf8");
 }
 
@@ -330,7 +352,7 @@ const failedReconnects = {};
 const lastLiveUpdate = {};
 const OFFLINE_TIMEOUT_MS = 2 * 60 * 1000;
 
-function connectEulerWSForUser(username) {
+async function connectEulerWSForUser(username) {
   resetRequestCounterIfNewDay();
 
   if (!canMakeRequest()) {
@@ -339,9 +361,14 @@ function connectEulerWSForUser(username) {
     return;
   }
 
-  recordRequest();
+  await recordRequest();
   if (requestState.count > REQUEST_LIMIT) return;
 
+  if (userConnections[username]) {
+  try {
+    userConnections[username].terminate();
+  } catch {}
+}
   const ws = new WebSocket(`wss://ws.eulerstream.com?uniqueId=${username}&apiKey=${apiKey}`);
   userConnections[username] = ws;
 
@@ -366,7 +393,7 @@ function connectEulerWSForUser(username) {
       const user = msg.data?.user;
       if (!room || !user) continue;
 
-      const userId = user.uniqueId;
+      const userId = username;
       const now = Date.now();
       const wasLive = !!liveStatus[userId];
 
@@ -458,6 +485,7 @@ function connectEulerWSForUser(username) {
   });
 
   ws.on("close", async (code, reason) => {
+    delete userConnections[username];
     const wasLive = !!liveStatus[username];
     
     if (wasLive) {
@@ -543,8 +571,6 @@ client.once("ready", async () => {
     connectEulerWSForUser(u);
   });
 
-  // Periodic offline check: if a user is marked live but hasn't received
-  // a live update in OFFLINE_TIMEOUT_MS, mark them offline.
   setInterval(async () => {
     const now = Date.now();
     for (const userId of Object.keys(liveStatus)) {
