@@ -1,6 +1,6 @@
 # 🐺 Wolf TCG Discord Bot
 
-![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)
+![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)
 ![Node.js](https://img.shields.io/badge/node.js-16%2B-green.svg)
 ![Discord.js](https://img.shields.io/badge/discord.js-14.24.2-5865F2.svg)
 
