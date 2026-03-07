@@ -333,7 +333,7 @@ function buildOfflineEmbed({ userId, startMs, endMs, room, user }) {
         inline: false,
       }
     )
-    .setImage(user?.avatarUrl || room?.coverUrl || "https://i.imgur.com/AfFp7pu.png")
+    .setImage(user?.avatarUrl || room?.coverUrl || userCache[userId]?.coverUrl || "https://i.imgur.com/AfFp7pu.png")
     .setFooter({ text: "Wolf TCG Alerts" })
     .setTimestamp(endMs);
 }
@@ -421,7 +421,7 @@ async function connectEulerWSForUser(username) {
 
         liveStatus[userId] = true;
         streamStartTimes[userId] = streamStart;
-        userCache[userId] = { uniqueId: user.uniqueId, avatarUrl: user.avatarUrl };
+        userCache[userId] = { uniqueId: user.uniqueId, avatarUrl: user.avatarUrl, coverUrl: room.coverUrl || null };
         if (room.title?.trim()) titleCache[userId] = room.title.trim();
         liveHistory.push({ userId, startTime: streamStart, endTime: null, title: room.title?.trim() || 'No title' });
         saveState();
@@ -474,7 +474,6 @@ async function connectEulerWSForUser(username) {
             historyEntry.endTime = now;
           }
           liveStatus[userId] = false;
-          delete titleCache[userId];
           saveState();
           logEvent(`🟢 [${userId}] Offline embed sent (stream ended normally).`, "green");
         } catch (err) {
@@ -543,7 +542,6 @@ async function connectEulerWSForUser(username) {
         }
 
         liveStatus[username] = false;
-        delete titleCache[username];
         saveState();
         failedReconnects[username] = 0;
 
@@ -609,7 +607,6 @@ client.once("ready", async () => {
           historyEntry.endTime = now;
         }
         liveStatus[userId] = false;
-        delete titleCache[userId];
         delete lastLiveUpdate[userId];
         saveState();
       } catch (err) {
