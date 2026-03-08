@@ -29,7 +29,6 @@ if (existsSync(envPath)) {
   }
 }
 
-const DEBUG_LOGS = process.env.DEBUG_LOGS === "true";
 const apiKey = process.env.EULER_API_KEY;
 const alertChannelId = process.env.ALERT_CHANNEL_ID;
 const ownerId = process.env.OWNER_ID;
@@ -92,7 +91,7 @@ try {
   console.warn(chalk.yellow(`⚠️ File logging disabled: ${err.message}`));
 }
 
-function logEvent(message, color = "white", force = false) {
+function logEvent(message, color = "white") {
   const timestamp = new Date().toLocaleString("en-GB", {
     hour: "2-digit",
     minute: "2-digit",
@@ -309,7 +308,6 @@ function buildOfflineEmbed({ userId, startMs, endMs, room, user }) {
   const duration = formatDuration((endMs ?? Date.now()) - (startMs ?? Date.now()));
   const startUnix = Math.floor(startMs / 1000);
   const endUnix = Math.floor(endMs / 1000);
-  const lastUpdateUnix = Math.floor(Date.now() / 1000);
   const rememberedTitle = room?.title?.trim() || titleCache[userId];
   const streamTitle = rememberedTitle ? `🎬 **${rememberedTitle}**` : "🎬 **No title**";
 
@@ -365,10 +363,10 @@ async function connectEulerWSForUser(username) {
   if (requestState.count > REQUEST_LIMIT) return;
 
   if (userConnections[username]) {
-  try {
-    userConnections[username].terminate();
-  } catch {}
-}
+    try {
+      userConnections[username].terminate();
+    } catch {}
+  }
   const ws = new WebSocket(`wss://ws.eulerstream.com?uniqueId=${username}&apiKey=${apiKey}`);
   userConnections[username] = ws;
 
