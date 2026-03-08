@@ -33,6 +33,7 @@ const apiKey = process.env.EULER_API_KEY;
 const alertChannelId = process.env.ALERT_CHANNEL_ID;
 const ownerId = process.env.OWNER_ID;
 const MAX_RECONNECT_ATTEMPTS = parseInt(process.env.MAX_RECONNECT_ATTEMPTS || "4", 10);
+const FLICKER_COOLDOWN_MS = parseInt(process.env.FLICKER_COOLDOWN_MS || "120000", 10);
 
 const tikTokUsers = (process.env.TIKTOK_USERS || "")
   .split(",")
@@ -92,6 +93,18 @@ try {
 }
 
 function logEvent(message, color = "white") {
+  // Rotate log file if date has changed
+  const currentDate = new Date().toISOString().slice(0, 10);
+  const expectedLogPath = path.join(logsDir, `wolf_tcg_log_${currentDate}.txt`);
+  if (fileLoggingEnabled && logPath !== expectedLogPath) {
+    logPath = expectedLogPath;
+    if (!existsSync(logPath)) {
+      const header = `──────────────────────────────\n🐺 Wolf TCG Bot Log — ${currentDate}\n──────────────────────────────\n`;
+      fs.writeFileSync(logPath, header, "utf8");
+    }
+    cleanupOldLogs();
+  }
+
   const timestamp = new Date().toLocaleString("en-GB", {
     hour: "2-digit",
     minute: "2-digit",
@@ -348,6 +361,7 @@ function liveActionRow(userId, isLive) {
 const userConnections = {};
 const failedReconnects = {};
 const lastLiveUpdate = {};
+const lastOfflineTime = {};
 const OFFLINE_TIMEOUT_MS = 2 * 60 * 1000;
 
 async function connectEulerWSForUser(username) {
@@ -408,6 +422,15 @@ async function connectEulerWSForUser(username) {
       }
 
       if (room.isLive && !wasLive) {
+        // Flicker protection: ignore re-live within cooldown of going offline
+        const lastOff = lastOfflineTime[userId] || 0;
+        if (lastOff > 0 && now - lastOff < FLICKER_COOLDOWN_MS) {
+          logEvent(`⏳ [${username}] Ignoring live event — flicker cooldown (${Math.round((FLICKER_COOLDOWN_MS - (now - lastOff)) / 1000)}s remaining)`, "yellow");
+          liveStatus[userId] = true;
+          lastLiveUpdate[userId] = now;
+          continue;
+        }
+
         const streamStart = (room.startTime ?? Math.floor(now / 1000)) * 1000;
         const detectedMs = now - streamStart;
 
@@ -441,6 +464,7 @@ async function connectEulerWSForUser(username) {
       }
 
       if (!room.isLive && wasLive) {
+        lastOfflineTime[userId] = now;
         try {
           const channel = await client.channels.fetch(alertChannelId);
           const msgId = sentMessages[userId];
@@ -452,21 +476,15 @@ async function connectEulerWSForUser(username) {
             room,
             user: user.avatarUrl ? user : userCache[userId] || { uniqueId: userId },
           });
+          // Delete original live message (removes stale @everyone ping) and post fresh offline
           const oldMsg = msgId ? await channel.messages.fetch(msgId).catch(() => null) : null;
-          if (oldMsg) {
-            await oldMsg.edit({
-              content: `**${userId}'s stream has ended.**`,
-              embeds: [embed],
-              components: [liveActionRow(userId, false)],
-            });
-          } else {
-            const newMsg = await channel.send({
-              content: `**${userId}'s stream has ended.**`,
-              embeds: [embed],
-              components: [liveActionRow(userId, false)],
-            });
-            sentMessages[userId] = newMsg.id;
-          }
+          if (oldMsg) await oldMsg.delete().catch(() => null);
+          const newMsg = await channel.send({
+            content: `**${userId}'s stream has ended.**`,
+            embeds: [embed],
+            components: [liveActionRow(userId, false)],
+          });
+          sentMessages[userId] = newMsg.id;
           const historyEntry = liveHistory.find(h => h.userId === userId && h.endTime === null);
           if (historyEntry) {
             historyEntry.endTime = now;
@@ -504,6 +522,7 @@ async function connectEulerWSForUser(username) {
     const attempt = failedReconnects[username] || 0;
 
     if (attempt >= MAX_RECONNECT_ATTEMPTS && wasLive) {
+      lastOfflineTime[username] = Date.now();
       try {
         const now = Date.now();
         const cachedUser = userCache[username] || { uniqueId: username };
@@ -519,20 +538,15 @@ async function connectEulerWSForUser(username) {
           user: cachedUser,
         });
 
+        // Delete original live message (removes stale @everyone ping) and post fresh offline
         const oldMsg = msgId ? await channel.messages.fetch(msgId).catch(() => null) : null;
-        if (oldMsg) {
-          await oldMsg.edit({
-            content: `**${username}'s stream has ended.**`,
-            embeds: [embed],
-            components: [liveActionRow(username, false)],
-          });
-        } else {
-          await channel.send({
-            content: `**${username}'s stream has ended.**`,
-            embeds: [embed],
-            components: [liveActionRow(username, false)],
-          });
-        }
+        if (oldMsg) await oldMsg.delete().catch(() => null);
+        const newMsg = await channel.send({
+          content: `**${username}'s stream has ended.**`,
+          embeds: [embed],
+          components: [liveActionRow(username, false)],
+        });
+        sentMessages[username] = newMsg.id;
 
         const historyEntry = liveHistory.find(h => h.userId === username && h.endTime === null);
         if (historyEntry) {
@@ -575,6 +589,7 @@ client.once("ready", async () => {
       if (now - last < OFFLINE_TIMEOUT_MS) continue;
 
       logEvent(`🔵 [${userId}] No live update for ${OFFLINE_TIMEOUT_MS / 1000}s — marking offline.`, "yellow");
+      lastOfflineTime[userId] = now;
       try {
         const channel = await client.channels.fetch(alertChannelId);
         const msgId = sentMessages[userId];
@@ -586,20 +601,15 @@ client.once("ready", async () => {
           room: { title: titleCache[userId] },
           user: userCache[userId] || { uniqueId: userId },
         });
+        // Delete original live message (removes stale @everyone ping) and post fresh offline
         const oldMsg = msgId ? await channel.messages.fetch(msgId).catch(() => null) : null;
-        if (oldMsg) {
-          await oldMsg.edit({
-            content: `**${userId}'s stream has ended.**`,
-            embeds: [embed],
-            components: [liveActionRow(userId, false)],
-          });
-        } else {
-          await channel.send({
-            content: `**${userId}'s stream has ended.**`,
-            embeds: [embed],
-            components: [liveActionRow(userId, false)],
-          });
-        }
+        if (oldMsg) await oldMsg.delete().catch(() => null);
+        const newMsg = await channel.send({
+          content: `**${userId}'s stream has ended.**`,
+          embeds: [embed],
+          components: [liveActionRow(userId, false)],
+        });
+        sentMessages[userId] = newMsg.id;
         const historyEntry = liveHistory.find(h => h.userId === userId && h.endTime === null);
         if (historyEntry) {
           historyEntry.endTime = now;
@@ -613,5 +623,23 @@ client.once("ready", async () => {
     }
   }, 30 * 1000);
 });
+
+// Graceful shutdown
+function gracefulShutdown(signal) {
+  logEvent(`🛑 Received ${signal} — shutting down gracefully...`, "yellow");
+  saveState();
+  saveRequestState();
+  for (const [username, ws] of Object.entries(userConnections)) {
+    try {
+      ws.terminate();
+      logEvent(`🔌 Closed WebSocket for ${username}`, "gray");
+    } catch {}
+  }
+  client.destroy();
+  logEvent("👋 Bot shut down cleanly.", "green");
+  process.exit(0);
+}
+process.on("SIGINT", () => gracefulShutdown("SIGINT"));
+process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
 
 client.login(process.env.DISCORD_TOKEN);

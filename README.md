@@ -1,6 +1,6 @@
 # 🐺 Wolf TCG Discord Bot
 
-![Version](https://img.shields.io/badge/version-1.2.1-blue.svg)
+![Version](https://img.shields.io/badge/version-1.3.0-blue.svg)
 ![Node.js](https://img.shields.io/badge/node.js-16%2B-green.svg)
 ![Discord.js](https://img.shields.io/badge/discord.js-14.24.2-5865F2.svg)
 
@@ -10,10 +10,14 @@ A sophisticated Discord bot that monitors TikTok streams using the Euler API Fre
 
 - **Live Stream Monitoring**: Automatically checks stream status every 90 seconds to stay under the 1000 daily API request limit.
 - **Smart Offline Detection**: Only counts reconnection attempts (max 4) when verifying if a live user went offline, unlimited checks when monitoring for users going live.
+- **Flicker Protection**: Ignores rapid offline/online transitions within a configurable cooldown (default 2 minutes), preventing duplicate live alerts from connection instability.
+- **Ping Suppression**: When a stream ends, the original `@everyone` live message is deleted and replaced with a clean offline embed, removing the stale ping.
 - **Rich Embeds**: Sends beautifully formatted Discord embeds for live notifications and stream end alerts.
 - **Owner Notifications**: Direct messages the bot owner with important updates, warnings, and alerts.
 - **Rate Limiting**: Built-in API request tracking with warnings at 900 requests and hard stop at 1000.
 - **Persistent State**: Remembers sent messages, stream start times, and user data across restarts.
+- **Graceful Shutdown**: Catches `SIGINT`/`SIGTERM` signals, saves all state, closes WebSockets, and exits cleanly. Safe for `Ctrl+C` and pm2 restarts.
+- **Daily Log Rotation**: Log files automatically rotate at midnight without requiring a restart.
 - **Automatic Log Cleanup**: Automatically deletes log files older than 3 days to save disk space.
 - **Enhanced Logging**: Detailed event logging with daily log files, includes API request counter in all log messages.
 - **Testing Tools**: Built-in alert testing system to verify all notifications work correctly.
@@ -63,6 +67,7 @@ TIKTOK_USERS=username1,username2,username3
 # Optional
 DEBUG_LOGS=true
 MAX_RECONNECT_ATTEMPTS=4
+FLICKER_COOLDOWN_MS=120000
 ```
 
 ### Getting Your Tokens and IDs
@@ -155,9 +160,16 @@ If you encounter issues:
 3. Ensure all prerequisites are met
 4. Open an issue with relevant log excerpts
 
-## 🔁 Changes & Deployment (updated 2026-03-01)
+## 🔁 Changes & Deployment (updated 2026-03-08)
 
-Recent repo changes:
+v1.3.0 changes:
+- Added **flicker protection** to prevent duplicate live alerts from rapid offline/online transitions.
+- Added **graceful shutdown** — bot now saves state and closes connections cleanly on `SIGINT`/`SIGTERM`.
+- Added **daily log rotation** — log files rotate at midnight automatically without restart.
+- Added **ping suppression** — offline events now delete the original `@everyone` message and post a clean offline embed.
+- Added configurable `FLICKER_COOLDOWN_MS` environment variable (default: 120000ms / 2 minutes).
+
+Previous changes:
 - Removed Docker artifacts (`Dockerfile`, `docker-compose.yml`, `.dockerignore`) to focus on running the bot directly in a host/container environment.
 - Restored file-based logging in the application while adding a safe fallback to console-only logging if file writes fail.
 
