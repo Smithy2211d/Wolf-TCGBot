@@ -1,4 +1,4 @@
-# 🐺 Wolf TCG Discord Bot
+#  Wolf TCG Discord Bot
 
 ![Version](https://img.shields.io/badge/version-1.4.0-blue.svg)
 ![Node.js](https://img.shields.io/badge/node.js-16%2B-green.svg)
@@ -6,7 +6,7 @@
 
 A sophisticated Discord bot that monitors TikTok streams using the Euler API Free Plan. It automatically detects when specified users go live or offline, sending rich embed notifications to a designated Discord channel.
 
-## ✨ Features
+##  Features
 
 - **Live Stream Monitoring**: Automatically checks stream status every 90 seconds (configurable) to stay under the 1000 daily API request limit.
 - **Viewer Count Tracking**: Displays current viewers and peak viewers in live embeds, and peak viewers in offline summaries.
@@ -26,14 +26,14 @@ A sophisticated Discord bot that monitors TikTok streams using the Euler API Fre
 - **Testing Tools**: Built-in alert testing system to verify all notifications work correctly.
 - **Error Handling**: Robust reconnection logic and graceful failure handling.
 
-## 📋 Prerequisites
+##  Prerequisites
 
 - Node.js (v16 or higher)
 - A Discord Bot Token (from [Discord Developer Portal](https://discord.com/developers/applications))
 - Euler API Key (from [Euler Stream](https://www.eulerstream.com/))
 - Discord Server with appropriate permissions
 
-## 🚀 Installation
+##  Installation
 
 1. **Clone or Download** the bot files to your local machine.
 
@@ -49,7 +49,7 @@ A sophisticated Discord bot that monitors TikTok streams using the Euler API Fre
    npm start
    ```
 
-## ⚙️ Configuration
+##  Configuration
 
 Copy `.env.example` to `.env` and fill in your actual values:
 
@@ -95,7 +95,7 @@ npm run dev
 npm run test-alerts
 ```
 
-## 🧪 Testing
+##  Testing
 
 Test all bot alerts and notifications without waiting for live streams:
 
@@ -125,7 +125,7 @@ The bot DMs you with important alerts and status updates.
 <img width="533" height="465" alt="image" src="https://github.com/user-attachments/assets/920d4382-5bb4-4471-8610-8314ba2a906e" />
 
 
-## 🔧 Troubleshooting
+##  Troubleshooting
 
 ### Common Issues
 
@@ -147,15 +147,15 @@ The bot DMs you with important alerts and status updates.
 ### Logs
 All events are logged to daily files in the `logs/` directory. Log files older than 3 days are automatically deleted. Check these for detailed error information.
 
-## 📄 License
+##  License
 
 ISC License - Feel free to use and modify as needed.
 
-## 🤝 Contributing
+##  Contributing
 
 Contributions are welcome! Please feel free to submit issues or pull requests.
 
-## 📞 Support
+##  Support
 
 If you encounter issues:
 1. Check the logs in `logs/wolf_tcg_log_YYYY-MM-DD.txt`
@@ -163,7 +163,7 @@ If you encounter issues:
 3. Ensure all prerequisites are met
 4. Open an issue with relevant log excerpts
 
-## 🔁 Changes & Deployment (updated 2026-03-08)
+##  Changes & Deployment (updated 2026-03-08)
 
 v1.3.0 changes:
 - Added **flicker protection** to prevent duplicate live alerts from rapid offline/online transitions.
