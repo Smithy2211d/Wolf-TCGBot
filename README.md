@@ -81,7 +81,7 @@ RECONNECT_DELAY_MS=90000
 - **OWNER_ID**: Right-click your username in Discord → Copy ID.
 - **TIKTOK_USERS**: Comma-separated list of TikTok usernames to monitor.
 
-## 🎮 Running the Bot
+##  Running the Bot
 
 ### Basic Usage
 ```bash
