@@ -65,7 +65,6 @@ OWNER_ID=your_discord_user_id_here
 TIKTOK_USERS=username1,username2,username3
 
 # Optional
-DEBUG_LOGS=true
 MAX_RECONNECT_ATTEMPTS=4
 FLICKER_COOLDOWN_MS=120000
 ```

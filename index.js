@@ -8,9 +8,8 @@ import {
 } from "discord.js";
 import dotenv from "dotenv";
 import WebSocket from "ws";
-import fs from "fs";
+import fs, { readFileSync, existsSync, writeFileSync } from "fs";
 import chalk from "chalk";
-import { readFileSync, existsSync, writeFileSync } from "fs";
 import { fileURLToPath } from "url";
 import path from "path";
 
@@ -93,7 +92,7 @@ try {
 }
 
 function logEvent(message, color = "white") {
-  // Rotate log file if date has changed
+  
   const currentDate = new Date().toISOString().slice(0, 10);
   const expectedLogPath = path.join(logsDir, `wolf_tcg_log_${currentDate}.txt`);
   if (fileLoggingEnabled && logPath !== expectedLogPath) {
@@ -208,6 +207,9 @@ const liveStatus = persistentState.liveStatus;
 const userCache = persistentState.userCache || {};
 const titleCache = persistentState.titleCache || {};
 const liveHistory = persistentState.liveHistory || [];
+persistentState.userCache = userCache;
+persistentState.titleCache = titleCache;
+persistentState.liveHistory = liveHistory;
 
 {
   const now = Date.now();
@@ -369,7 +371,7 @@ async function connectEulerWSForUser(username) {
 
   if (!canMakeRequest()) {
     logEvent(`🚫 Daily API request limit (${REQUEST_LIMIT}) reached. Skipping ${username}.`, "red");
-    notifyOwner(`⚠️ Request limit (${REQUEST_LIMIT}) reached — skipping connection for ${username}.`, "warn");
+    await notifyOwner(`⚠️ Request limit (${REQUEST_LIMIT}) reached — skipping connection for ${username}.`, "warn");
     return;
   }
 
@@ -422,7 +424,7 @@ async function connectEulerWSForUser(username) {
       }
 
       if (room.isLive && !wasLive) {
-        // Flicker protection: ignore re-live within cooldown of going offline
+
         const lastOff = lastOfflineTime[userId] || 0;
         if (lastOff > 0 && now - lastOff < FLICKER_COOLDOWN_MS) {
           logEvent(`⏳ [${username}] Ignoring live event — flicker cooldown (${Math.round((FLICKER_COOLDOWN_MS - (now - lastOff)) / 1000)}s remaining)`, "yellow");
@@ -476,7 +478,7 @@ async function connectEulerWSForUser(username) {
             room,
             user: user.avatarUrl ? user : userCache[userId] || { uniqueId: userId },
           });
-          // Delete original live message (removes stale @everyone ping) and post fresh offline
+
           const oldMsg = msgId ? await channel.messages.fetch(msgId).catch(() => null) : null;
           if (oldMsg) await oldMsg.delete().catch(() => null);
           const newMsg = await channel.send({
@@ -538,7 +540,6 @@ async function connectEulerWSForUser(username) {
           user: cachedUser,
         });
 
-        // Delete original live message (removes stale @everyone ping) and post fresh offline
         const oldMsg = msgId ? await channel.messages.fetch(msgId).catch(() => null) : null;
         if (oldMsg) await oldMsg.delete().catch(() => null);
         const newMsg = await channel.send({
@@ -573,7 +574,7 @@ async function connectEulerWSForUser(username) {
   });
 }
 
-client.once("ready", async () => {
+client.once("clientReady", async () => {
   logEvent(`✅ Logged in as ${client.user.tag}`, "blue");
   await notifyOwner(`Bot restarted and logged in as **${client.user.tag}** 🚀`, "success");
   tikTokUsers.forEach((u) => {
@@ -601,7 +602,7 @@ client.once("ready", async () => {
           room: { title: titleCache[userId] },
           user: userCache[userId] || { uniqueId: userId },
         });
-        // Delete original live message (removes stale @everyone ping) and post fresh offline
+
         const oldMsg = msgId ? await channel.messages.fetch(msgId).catch(() => null) : null;
         if (oldMsg) await oldMsg.delete().catch(() => null);
         const newMsg = await channel.send({
@@ -624,7 +625,6 @@ client.once("ready", async () => {
   }, 30 * 1000);
 });
 
-// Graceful shutdown
 function gracefulShutdown(signal) {
   logEvent(`🛑 Received ${signal} — shutting down gracefully...`, "yellow");
   saveState();
@@ -641,5 +641,8 @@ function gracefulShutdown(signal) {
 }
 process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+process.on("unhandledRejection", (err) => {
+  logEvent(`⚠️ Unhandled rejection: ${err?.message || err}`, "red");
+});
 
 client.login(process.env.DISCORD_TOKEN);

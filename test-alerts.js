@@ -173,7 +173,7 @@ function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-client.once("ready", async () => {
+client.once("clientReady", async () => {
   console.log(`✅ Logged in as ${client.user.tag}`);
   await runTests();
 });
