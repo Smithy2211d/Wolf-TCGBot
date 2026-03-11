@@ -37,6 +37,7 @@ const ownerId = process.env.OWNER_ID;
 const MAX_RECONNECT_ATTEMPTS = parseInt(process.env.MAX_RECONNECT_ATTEMPTS || "4", 10);
 const FLICKER_COOLDOWN_MS = parseInt(process.env.FLICKER_COOLDOWN_MS || "120000", 10);
 const RECONNECT_DELAY_MS = parseInt(process.env.RECONNECT_DELAY_MS || "90000", 10);
+const guildId = process.env.GUILD_ID;
 
 const tikTokUsers = (process.env.TIKTOK_USERS || "")
   .split(",")
@@ -247,7 +248,6 @@ const client = new Client({
   intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.DirectMessages],
 });
 
-// Slash command definitions
 const commands = [
   new SlashCommandBuilder()
     .setName("status")
@@ -612,13 +612,19 @@ async function connectEulerWSForUser(username) {
 client.once("clientReady", async () => {
   logEvent(`✅ Logged in as ${client.user.tag}`, "blue");
 
-  // Register slash commands
   try {
     const rest = new REST({ version: "10" }).setToken(process.env.DISCORD_TOKEN);
-    await rest.put(Routes.applicationCommands(client.user.id), {
-      body: commands.map((c) => c.toJSON()),
-    });
-    logEvent("📝 Slash commands registered.", "blue");
+    if (guildId) {
+      await rest.put(Routes.applicationGuildCommands(client.user.id, guildId), {
+        body: commands.map((c) => c.toJSON()),
+      });
+      logEvent(`📝 Slash commands registered to guild ${guildId}.`, "blue");
+    } else {
+      await rest.put(Routes.applicationCommands(client.user.id), {
+        body: commands.map((c) => c.toJSON()),
+      });
+      logEvent("📝 Slash commands registered globally (may take up to 1 hour).", "blue");
+    }
   } catch (err) {
     logEvent(`❌ Failed to register slash commands: ${err.message}`, "red");
   }
@@ -629,7 +635,6 @@ client.once("clientReady", async () => {
     connectEulerWSForUser(u);
   });
 
-  // Periodically update live embeds with fresh viewer counts
   setInterval(async () => {
     for (const userId of Object.keys(liveStatus)) {
       if (!liveStatus[userId]) continue;
