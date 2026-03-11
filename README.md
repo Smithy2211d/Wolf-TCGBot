@@ -1,6 +1,6 @@
 # 🐺 Wolf TCG Discord Bot
 
-![Version](https://img.shields.io/badge/version-1.3.0-blue.svg)
+![Version](https://img.shields.io/badge/version-1.4.0-blue.svg)
 ![Node.js](https://img.shields.io/badge/node.js-16%2B-green.svg)
 ![Discord.js](https://img.shields.io/badge/discord.js-14.24.2-5865F2.svg)
 
@@ -8,7 +8,10 @@ A sophisticated Discord bot that monitors TikTok streams using the Euler API Fre
 
 ## ✨ Features
 
-- **Live Stream Monitoring**: Automatically checks stream status every 90 seconds to stay under the 1000 daily API request limit.
+- **Live Stream Monitoring**: Automatically checks stream status every 90 seconds (configurable) to stay under the 1000 daily API request limit.
+- **Viewer Count Tracking**: Displays current viewers and peak viewers in live embeds, and peak viewers in offline summaries.
+- **Live Embed Updates**: Automatically refreshes the live embed every 60 seconds with updated viewer counts and timestamps.
+- **Slash Commands**: `/status` to see who's live, `/history` to view recent streams, `/uptime` to check bot status and API usage.
 - **Smart Offline Detection**: Only counts reconnection attempts (max 4) when verifying if a live user went offline, unlimited checks when monitoring for users going live.
 - **Flicker Protection**: Ignores rapid offline/online transitions within a configurable cooldown (default 2 minutes), preventing duplicate live alerts from connection instability.
 - **Ping Suppression**: When a stream ends, the original `@everyone` live message is deleted and replaced with a clean offline embed, removing the stale ping.
@@ -67,6 +70,7 @@ TIKTOK_USERS=username1,username2,username3
 # Optional
 MAX_RECONNECT_ATTEMPTS=4
 FLICKER_COOLDOWN_MS=120000
+RECONNECT_DELAY_MS=90000
 ```
 
 ### Getting Your Tokens and IDs

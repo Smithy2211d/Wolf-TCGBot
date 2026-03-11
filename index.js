@@ -5,6 +5,9 @@ import {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
+  REST,
+  Routes,
+  SlashCommandBuilder,
 } from "discord.js";
 import dotenv from "dotenv";
 import WebSocket from "ws";
@@ -33,6 +36,7 @@ const alertChannelId = process.env.ALERT_CHANNEL_ID;
 const ownerId = process.env.OWNER_ID;
 const MAX_RECONNECT_ATTEMPTS = parseInt(process.env.MAX_RECONNECT_ATTEMPTS || "4", 10);
 const FLICKER_COOLDOWN_MS = parseInt(process.env.FLICKER_COOLDOWN_MS || "120000", 10);
+const RECONNECT_DELAY_MS = parseInt(process.env.RECONNECT_DELAY_MS || "90000", 10);
 
 const tikTokUsers = (process.env.TIKTOK_USERS || "")
   .split(",")
@@ -243,6 +247,22 @@ const client = new Client({
   intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.DirectMessages],
 });
 
+// Slash command definitions
+const commands = [
+  new SlashCommandBuilder()
+    .setName("status")
+    .setDescription("Check who is currently live"),
+  new SlashCommandBuilder()
+    .setName("history")
+    .setDescription("View recent stream history")
+    .addIntegerOption(opt =>
+      opt.setName("count").setDescription("Number of entries to show (default: 5)").setRequired(false)
+    ),
+  new SlashCommandBuilder()
+    .setName("uptime")
+    .setDescription("Check bot uptime and API usage"),
+];
+
 let ownerUser = null;
 async function notifyOwner(message, type = "info") {
   if (!ownerId) return;
@@ -295,6 +315,8 @@ function buildLiveEmbed({ userId, room, user }) {
     minute: "2-digit",
   });
   const streamTitle = room?.title?.trim() ? `🎬 **${room.title}**` : "🎬 **No title**";
+  const currentViewers = viewerCounts[userId] || 0;
+  const peak = peakViewers[userId] || 0;
 
   return new EmbedBuilder()
     .setColor(0xff0000)
@@ -306,7 +328,7 @@ function buildLiveEmbed({ userId, room, user }) {
     .setTitle(`${user?.uniqueId || userId}'s stream is LIVE!`)
     .addFields(
       { name: "Status", value: "🔴 Live Now!", inline: true },
-      { name: "Streamer", value: `[${userId}](https://www.tiktok.com/@${userId})`, inline: true },
+      { name: "Viewers", value: `👀 **${currentViewers.toLocaleString()}** (Peak: **${peak.toLocaleString()}**)`, inline: true },
       { name: "Title", value: streamTitle, inline: false },
       {
         name: "Stream Info",
@@ -325,6 +347,7 @@ function buildOfflineEmbed({ userId, startMs, endMs, room, user }) {
   const endUnix = Math.floor(endMs / 1000);
   const rememberedTitle = room?.title?.trim() || titleCache[userId];
   const streamTitle = rememberedTitle ? `🎬 **${rememberedTitle}**` : "🎬 **No title**";
+  const peak = peakViewers[userId] || 0;
 
   return new EmbedBuilder()
     .setColor(0x57f287)
@@ -336,6 +359,7 @@ function buildOfflineEmbed({ userId, startMs, endMs, room, user }) {
     .setTitle(`${user?.uniqueId || userId}'s stream has ended.`)
     .addFields(
       { name: "Status", value: "🟢 Stream Ended", inline: true },
+      { name: "Peak Viewers", value: `👀 **${peak.toLocaleString()}**`, inline: true },
       { name: "Title", value: streamTitle, inline: false },
       {
         name: "Stream Info",
@@ -364,7 +388,11 @@ const userConnections = {};
 const failedReconnects = {};
 const lastLiveUpdate = {};
 const lastOfflineTime = {};
+const viewerCounts = {};
+const peakViewers = {};
 const OFFLINE_TIMEOUT_MS = 2 * 60 * 1000;
+const EMBED_UPDATE_INTERVAL_MS = 60 * 1000;
+const botStartTime = Date.now();
 
 async function connectEulerWSForUser(username) {
   resetRequestCounterIfNewDay();
@@ -386,7 +414,7 @@ async function connectEulerWSForUser(username) {
   const ws = new WebSocket(`wss://ws.eulerstream.com?uniqueId=${username}&apiKey=${apiKey}`);
   userConnections[username] = ws;
 
-  const reconnectDelay = 90 * 1000;
+  const reconnectDelay = RECONNECT_DELAY_MS;
 
   ws.on("open", async () => {
     logEvent(`🟢 Connected to EulerStream for ${username} | API: ${requestState.count}/${REQUEST_LIMIT}`, "green");
@@ -421,6 +449,11 @@ async function connectEulerWSForUser(username) {
 
       if (room.isLive) {
         lastLiveUpdate[userId] = now;
+        const viewers = room.userCount || room.viewerCount || 0;
+        viewerCounts[userId] = viewers;
+        if (viewers > (peakViewers[userId] || 0)) {
+          peakViewers[userId] = viewers;
+        }
       }
 
       if (room.isLive && !wasLive) {
@@ -444,6 +477,8 @@ async function connectEulerWSForUser(username) {
 
         liveStatus[userId] = true;
         streamStartTimes[userId] = streamStart;
+        viewerCounts[userId] = 0;
+        peakViewers[userId] = 0;
         userCache[userId] = { uniqueId: user.uniqueId, avatarUrl: user.avatarUrl, coverUrl: room.coverUrl || null };
         if (room.title?.trim()) titleCache[userId] = room.title.trim();
         liveHistory.push({ userId, startTime: streamStart, endTime: null, title: room.title?.trim() || 'No title' });
@@ -516,7 +551,7 @@ async function connectEulerWSForUser(username) {
     } else {
       const currentAttempts = failedReconnects[username] || 0;
       logEvent(
-        `🔴 [${username}] WS closed (code ${code}) | Live check (${currentAttempts} offline attempts stored) | API: ${requestState.count}/${REQUEST_LIMIT} | Reconnecting in 90s`,
+        `🔴 [${username}] WS closed (code ${code}) | Live check (${currentAttempts} offline attempts stored) | API: ${requestState.count}/${REQUEST_LIMIT} | Reconnecting in ${RECONNECT_DELAY_MS / 1000}s`,
         "gray"
       );
     }
@@ -576,11 +611,48 @@ async function connectEulerWSForUser(username) {
 
 client.once("clientReady", async () => {
   logEvent(`✅ Logged in as ${client.user.tag}`, "blue");
+
+  // Register slash commands
+  try {
+    const rest = new REST({ version: "10" }).setToken(process.env.DISCORD_TOKEN);
+    await rest.put(Routes.applicationCommands(client.user.id), {
+      body: commands.map((c) => c.toJSON()),
+    });
+    logEvent("📝 Slash commands registered.", "blue");
+  } catch (err) {
+    logEvent(`❌ Failed to register slash commands: ${err.message}`, "red");
+  }
+
   await notifyOwner(`Bot restarted and logged in as **${client.user.tag}** 🚀`, "success");
   tikTokUsers.forEach((u) => {
     liveStatus[u] = false;
     connectEulerWSForUser(u);
   });
+
+  // Periodically update live embeds with fresh viewer counts
+  setInterval(async () => {
+    for (const userId of Object.keys(liveStatus)) {
+      if (!liveStatus[userId]) continue;
+      const msgId = sentMessages[userId];
+      if (!msgId) continue;
+      try {
+        const channel = await client.channels.fetch(alertChannelId);
+        const msg = await channel.messages.fetch(msgId).catch(() => null);
+        if (!msg) continue;
+        const cached = userCache[userId] || { uniqueId: userId };
+        const startMs = streamStartTimes[userId] || Date.now();
+        const room = {
+          startTime: Math.floor(startMs / 1000),
+          title: titleCache[userId] || "",
+          coverUrl: cached.coverUrl || null,
+        };
+        const embed = buildLiveEmbed({ userId, room, user: cached });
+        await msg.edit({ embeds: [embed], components: [liveActionRow(userId, true)] });
+      } catch (err) {
+        logEvent(`⚠️ [${userId}] Failed to update live embed: ${err.message}`, "yellow");
+      }
+    }
+  }, EMBED_UPDATE_INTERVAL_MS);
 
   setInterval(async () => {
     const now = Date.now();
@@ -623,6 +695,93 @@ client.once("clientReady", async () => {
       }
     }
   }, 30 * 1000);
+});
+
+client.on("interactionCreate", async (interaction) => {
+  if (!interaction.isChatInputCommand()) return;
+
+  if (interaction.commandName === "status") {
+    const liveUsers = Object.keys(liveStatus).filter((u) => liveStatus[u]);
+    if (liveUsers.length === 0) {
+      const embed = new EmbedBuilder()
+        .setColor(0x5865f2)
+        .setTitle("🐺 Stream Status")
+        .setDescription("No one is currently live.")
+        .setFooter({ text: "Wolf TCG Alerts" })
+        .setTimestamp();
+      return interaction.reply({ embeds: [embed] });
+    }
+    const fields = liveUsers.map((u) => {
+      const startMs = streamStartTimes[u] || Date.now();
+      const viewers = viewerCounts[u] || 0;
+      const peak = peakViewers[u] || 0;
+      const title = titleCache[u] || "No title";
+      return {
+        name: `🔴 ${userCache[u]?.uniqueId || u}`,
+        value:
+          `**Title:** ${title}\n` +
+          `**Viewers:** ${viewers.toLocaleString()} (Peak: ${peak.toLocaleString()})\n` +
+          `**Live since:** <t:${Math.floor(startMs / 1000)}:R>\n` +
+          `[Watch Live](https://www.tiktok.com/@${u})`,
+        inline: false,
+      };
+    });
+    const embed = new EmbedBuilder()
+      .setColor(0xff0000)
+      .setTitle("🐺 Stream Status")
+      .addFields(fields)
+      .setFooter({ text: "Wolf TCG Alerts" })
+      .setTimestamp();
+    return interaction.reply({ embeds: [embed] });
+  }
+
+  if (interaction.commandName === "history") {
+    const count = Math.min(interaction.options.getInteger("count") || 5, 15);
+    const recent = liveHistory.slice(-count).reverse();
+    if (recent.length === 0) {
+      const embed = new EmbedBuilder()
+        .setColor(0x5865f2)
+        .setTitle("🐺 Stream History")
+        .setDescription("No stream history recorded yet.")
+        .setFooter({ text: "Wolf TCG Alerts" })
+        .setTimestamp();
+      return interaction.reply({ embeds: [embed] });
+    }
+    const lines = recent.map((h, i) => {
+      const start = `<t:${Math.floor(h.startTime / 1000)}:f>`;
+      const end = h.endTime ? `<t:${Math.floor(h.endTime / 1000)}:f>` : "🔴 Still Live";
+      const dur = h.endTime ? formatDuration(h.endTime - h.startTime) : "Ongoing";
+      return `**${i + 1}.** **${h.userId}** — ${h.title || "No title"}\n　　${start} → ${end} (${dur})`;
+    });
+    const embed = new EmbedBuilder()
+      .setColor(0x5865f2)
+      .setTitle("🐺 Stream History")
+      .setDescription(lines.join("\n\n"))
+      .setFooter({ text: `Showing ${recent.length} of ${liveHistory.length} entries` })
+      .setTimestamp();
+    return interaction.reply({ embeds: [embed] });
+  }
+
+  if (interaction.commandName === "uptime") {
+    const uptime = formatDuration(Date.now() - botStartTime);
+    resetRequestCounterIfNewDay();
+    const liveCount = Object.keys(liveStatus).filter((u) => liveStatus[u]).length;
+    const connectedCount = Object.keys(userConnections).length;
+    const embed = new EmbedBuilder()
+      .setColor(0x5865f2)
+      .setTitle("🐺 Bot Status")
+      .addFields(
+        { name: "Uptime", value: `⏱️ ${uptime}`, inline: true },
+        { name: "API Usage", value: `📊 ${requestState.count}/${REQUEST_LIMIT}`, inline: true },
+        { name: "Monitoring", value: `👥 ${tikTokUsers.length} users`, inline: true },
+        { name: "Live Now", value: `🔴 ${liveCount}`, inline: true },
+        { name: "WS Connections", value: `🔌 ${connectedCount}`, inline: true },
+        { name: "Reconnect Delay", value: `⏳ ${RECONNECT_DELAY_MS / 1000}s`, inline: true },
+      )
+      .setFooter({ text: "Wolf TCG Alerts" })
+      .setTimestamp();
+    return interaction.reply({ embeds: [embed] });
+  }
 });
 
 function gracefulShutdown(signal) {
