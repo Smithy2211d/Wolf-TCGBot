@@ -315,9 +315,7 @@ function buildLiveEmbed({ userId, room, user }) {
     minute: "2-digit",
   });
   const streamTitle = room?.title?.trim() ? `🎬 **${room.title}**` : "🎬 **No title**";
-  const currentViewers = viewerCounts[userId] || 0;
-  const peak = peakViewers[userId] || 0;
-
+  // TEMP: Remove viewer counters due to lack of updates
   return new EmbedBuilder()
     .setColor(0xff0000)
     .setAuthor({
@@ -328,7 +326,6 @@ function buildLiveEmbed({ userId, room, user }) {
     .setTitle(`${user?.uniqueId || userId}'s stream is LIVE!`)
     .addFields(
       { name: "Status", value: "🔴 Live Now!", inline: true },
-      { name: "Viewers", value: `👀 **${currentViewers.toLocaleString()}** (Peak: **${peak.toLocaleString()}**)`, inline: true },
       { name: "Title", value: streamTitle, inline: false },
       {
         name: "Stream Info",
@@ -347,8 +344,7 @@ function buildOfflineEmbed({ userId, startMs, endMs, room, user }) {
   const endUnix = Math.floor(endMs / 1000);
   const rememberedTitle = room?.title?.trim() || titleCache[userId];
   const streamTitle = rememberedTitle ? `🎬 **${rememberedTitle}**` : "🎬 **No title**";
-  const peak = peakViewers[userId] || 0;
-
+  // TEMP: Remove peak viewers field due to lack of updates
   return new EmbedBuilder()
     .setColor(0x57f287)
     .setAuthor({
@@ -359,7 +355,6 @@ function buildOfflineEmbed({ userId, startMs, endMs, room, user }) {
     .setTitle(`${user?.uniqueId || userId}'s stream has ended.`)
     .addFields(
       { name: "Status", value: "🟢 Stream Ended", inline: true },
-      { name: "Peak Viewers", value: `👀 **${peak.toLocaleString()}**`, inline: true },
       { name: "Title", value: streamTitle, inline: false },
       {
         name: "Stream Info",
