@@ -1,6 +1,6 @@
 #  Wolf TCG Discord Bot
 
-![Version](https://img.shields.io/badge/version-1.4.0-blue.svg)
+![Version](https://img.shields.io/badge/version-1.5.0-blue.svg)
 ![Node.js](https://img.shields.io/badge/node.js-16%2B-green.svg)
 ![Discord.js](https://img.shields.io/badge/discord.js-14.24.2-5865F2.svg)
 
@@ -30,7 +30,7 @@ A sophisticated Discord bot that monitors TikTok streams using the Euler API Fre
 - **Testing Tools**: Built-in alert testing system to verify all notifications work correctly.
 - **Error Handling**: Robust reconnection logic and graceful failure handling.
 
-
+##  Prerequisites
 
 ##  Prerequisites
 

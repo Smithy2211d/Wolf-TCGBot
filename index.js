@@ -676,87 +676,92 @@ client.once("clientReady", async () => {
 client.on("interactionCreate", async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
 
-  if (interaction.commandName === "status") {
-    const liveUsers = Object.keys(liveStatus).filter((u) => liveStatus[u]);
-    if (liveUsers.length === 0) {
+  try {
+    await interaction.deferReply({ ephemeral: false });
+
+    if (interaction.commandName === "status") {
+      const liveUsers = Object.keys(liveStatus).filter((u) => liveStatus[u]);
+      if (liveUsers.length === 0) {
+        const embed = new EmbedBuilder()
+          .setColor(0x5865f2)
+          .setTitle("🐺 Stream Status")
+          .setDescription("No one is currently live.")
+          .setFooter({ text: "Wolf TCG Alerts" })
+          .setTimestamp();
+        return await interaction.editReply({ embeds: [embed] });
+      }
+      const fields = liveUsers.map((u) => {
+        const title = titleCache[u] || "No title";
+        return {
+          name: `🔴 ${userCache[u]?.uniqueId || u}`,
+          value:
+            `**Title:** ${title}\n` +
+            `**Live since:** <t:${Math.floor((streamStartTimes[u] || Date.now()) / 1000)}:R>\n` +
+            `[Watch Live](https://www.tiktok.com/@${u})`,
+          inline: false,
+        };
+      });
       const embed = new EmbedBuilder()
-        .setColor(0x5865f2)
+        .setColor(0xff0000)
         .setTitle("🐺 Stream Status")
-        .setDescription("No one is currently live.")
+        .addFields(fields)
         .setFooter({ text: "Wolf TCG Alerts" })
         .setTimestamp();
-      return interaction.reply({ embeds: [embed] });
+      return await interaction.editReply({ embeds: [embed] });
     }
-    const fields = liveUsers.map((u) => {
-      const startMs = streamStartTimes[u] || Date.now();
-      const viewers = viewerCounts[u] || 0;
-      const peak = peakViewers[u] || 0;
-      const title = titleCache[u] || "No title";
-      return {
-        name: `🔴 ${userCache[u]?.uniqueId || u}`,
-        value:
-          `**Title:** ${title}\n` +
-          `**Viewers:** ${viewers.toLocaleString()} (Peak: ${peak.toLocaleString()})\n` +
-          `**Live since:** <t:${Math.floor(startMs / 1000)}:R>\n` +
-          `[Watch Live](https://www.tiktok.com/@${u})`,
-        inline: false,
-      };
-    });
-    const embed = new EmbedBuilder()
-      .setColor(0xff0000)
-      .setTitle("🐺 Stream Status")
-      .addFields(fields)
-      .setFooter({ text: "Wolf TCG Alerts" })
-      .setTimestamp();
-    return interaction.reply({ embeds: [embed] });
-  }
 
-  if (interaction.commandName === "history") {
-    const count = Math.min(interaction.options.getInteger("count") || 5, 15);
-    const recent = liveHistory.slice(-count).reverse();
-    if (recent.length === 0) {
+    if (interaction.commandName === "history") {
+      const count = Math.min(interaction.options.getInteger("count") || 5, 15);
+      const recent = liveHistory.slice(-count).reverse();
+      if (recent.length === 0) {
+        const embed = new EmbedBuilder()
+          .setColor(0x5865f2)
+          .setTitle("🐺 Stream History")
+          .setDescription("No stream history recorded yet.")
+          .setFooter({ text: "Wolf TCG Alerts" })
+          .setTimestamp();
+        return await interaction.editReply({ embeds: [embed] });
+      }
+      const lines = recent.map((h, i) => {
+        const start = `<t:${Math.floor(h.startTime / 1000)}:f>`;
+        const end = h.endTime ? `<t:${Math.floor(h.endTime / 1000)}:f>` : "🔴 Still Live";
+        const dur = h.endTime ? formatDuration(h.endTime - h.startTime) : "Ongoing";
+        return `**${i + 1}.** **${h.userId}** — ${h.title || "No title"}\n　　${start} → ${end} (${dur})`;
+      });
       const embed = new EmbedBuilder()
         .setColor(0x5865f2)
         .setTitle("🐺 Stream History")
-        .setDescription("No stream history recorded yet.")
+        .setDescription(lines.join("\n\n"))
+        .setFooter({ text: `Showing ${recent.length} of ${liveHistory.length} entries` })
+        .setTimestamp();
+      return await interaction.editReply({ embeds: [embed] });
+    }
+
+    if (interaction.commandName === "uptime") {
+      const uptime = formatDuration(Date.now() - botStartTime);
+      resetRequestCounterIfNewDay();
+      const liveCount = Object.keys(liveStatus).filter((u) => liveStatus[u]).length;
+      const connectedCount = Object.keys(userConnections).length;
+      const embed = new EmbedBuilder()
+        .setColor(0x5865f2)
+        .setTitle("🐺 Bot Status")
+        .addFields(
+          { name: "Uptime", value: `⏱️ ${uptime}` , inline: true },
+          { name: "API Usage", value: `📊 ${requestState.count}/${REQUEST_LIMIT}` , inline: true },
+          { name: "Monitoring", value: `👥 ${tikTokUsers.length} users`, inline: true },
+          { name: "Live Now", value: `🔴 ${liveCount}`, inline: true },
+          { name: "WS Connections", value: `🔌 ${connectedCount}`, inline: true },
+          { name: "Reconnect Delay", value: `⏳ ${RECONNECT_DELAY_MS / 1000}s`, inline: true },
+        )
         .setFooter({ text: "Wolf TCG Alerts" })
         .setTimestamp();
-      return interaction.reply({ embeds: [embed] });
+      return await interaction.editReply({ embeds: [embed] });
     }
-    const lines = recent.map((h, i) => {
-      const start = `<t:${Math.floor(h.startTime / 1000)}:f>`;
-      const end = h.endTime ? `<t:${Math.floor(h.endTime / 1000)}:f>` : "🔴 Still Live";
-      const dur = h.endTime ? formatDuration(h.endTime - h.startTime) : "Ongoing";
-      return `**${i + 1}.** **${h.userId}** — ${h.title || "No title"}\n　　${start} → ${end} (${dur})`;
-    });
-    const embed = new EmbedBuilder()
-      .setColor(0x5865f2)
-      .setTitle("🐺 Stream History")
-      .setDescription(lines.join("\n\n"))
-      .setFooter({ text: `Showing ${recent.length} of ${liveHistory.length} entries` })
-      .setTimestamp();
-    return interaction.reply({ embeds: [embed] });
-  }
-
-  if (interaction.commandName === "uptime") {
-    const uptime = formatDuration(Date.now() - botStartTime);
-    resetRequestCounterIfNewDay();
-    const liveCount = Object.keys(liveStatus).filter((u) => liveStatus[u]).length;
-    const connectedCount = Object.keys(userConnections).length;
-    const embed = new EmbedBuilder()
-      .setColor(0x5865f2)
-      .setTitle("🐺 Bot Status")
-      .addFields(
-        { name: "Uptime", value: `⏱️ ${uptime}`, inline: true },
-        { name: "API Usage", value: `📊 ${requestState.count}/${REQUEST_LIMIT}`, inline: true },
-        { name: "Monitoring", value: `👥 ${tikTokUsers.length} users`, inline: true },
-        { name: "Live Now", value: `🔴 ${liveCount}`, inline: true },
-        { name: "WS Connections", value: `🔌 ${connectedCount}`, inline: true },
-        { name: "Reconnect Delay", value: `⏳ ${RECONNECT_DELAY_MS / 1000}s`, inline: true },
-      )
-      .setFooter({ text: "Wolf TCG Alerts" })
-      .setTimestamp();
-    return interaction.reply({ embeds: [embed] });
+  } catch (err) {
+    try {
+      await interaction.editReply({ content: `❌ An error occurred: ${err.message}` });
+    } catch {}
+    logEvent(`❌ [INTERACTION] Error handling command: ${err.message}`, "red");
   }
 });
 
