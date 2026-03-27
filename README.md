@@ -31,8 +31,6 @@ A sophisticated Discord bot that monitors TikTok streams using the Euler API Fre
 - **Error Handling**: Robust reconnection logic and graceful failure handling.
 
 
-**TEMPORARY CHANGE (March 2026):**
-- The live and offline viewer counters have been removed from Discord embeds due to lack of real-time updates from the upstream service. Embeds will not display current or peak viewers until reliable updates are available again.
 
 ##  Prerequisites
 
