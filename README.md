@@ -6,7 +6,9 @@
 
 A sophisticated Discord bot that monitors TikTok streams using the Euler API Free Plan. It automatically detects when specified users go live or offline, sending rich embed notifications to a designated Discord channel.
 ---
-**Note:** As of March 2026, the offline timeout logic (which marks a user offline if no live update is received for 120 seconds) is temporarily disabled to prevent false offline alerts when the user is still live. The bot will not mark a user offline due to missing updates until this logic is re-enabled.
+**TEMPORARY CHANGE (March 2026):**
+- The live and offline viewer counters have been removed from Discord embeds due to lack of real-time updates from the upstream service. Embeds will not display current or peak viewers until reliable updates are available again.
+- As of March 2026, the offline timeout logic (which marks a user offline if no live update is received for 120 seconds) is temporarily disabled to prevent false offline alerts when the user is still live. The bot will not mark a user offline due to missing updates until this logic is re-enabled.
 
 ##  Features
 
