@@ -391,7 +391,7 @@ const lastOfflineTime = {};
 const viewerCounts = {};
 const peakViewers = {};
 const OFFLINE_TIMEOUT_MS = 2 * 60 * 1000;
-const EMBED_UPDATE_INTERVAL_MS = 60 * 1000;
+const EMBED_UPDATE_INTERVAL_MS = 10 * 1000;
 const botStartTime = Date.now();
 
 async function connectEulerWSForUser(username) {
@@ -418,6 +418,7 @@ async function connectEulerWSForUser(username) {
 
   ws.on("open", async () => {
     logEvent(`🟢 Connected to EulerStream for ${username} | API: ${requestState.count}/${REQUEST_LIMIT}`, "green");
+
   });
 
   ws.on("message", async (raw) => {
@@ -439,6 +440,9 @@ async function connectEulerWSForUser(username) {
       const now = Date.now();
       const wasLive = !!liveStatus[userId];
 
+      // DEBUG: Log every roomInfo message received
+      logEvent(`[DEBUG] Received roomInfo for ${userId}: isLive=${room.isLive}, now=${now}`);
+
       if (room.isLive || !wasLive) {
         const previousAttempts = failedReconnects[username] || 0;
         if (previousAttempts > 0) {
@@ -449,7 +453,12 @@ async function connectEulerWSForUser(username) {
 
       if (room.isLive) {
         lastLiveUpdate[userId] = now;
-        const viewers = room.userCount || room.viewerCount || 0;
+        // DEBUG: Log when lastLiveUpdate is set
+        logEvent(`[DEBUG] Updated lastLiveUpdate for ${userId}: ${now}`);
+        // DEBUG: Log the raw room object and viewer count fields
+        logEvent(`[DEBUG] Raw room object for ${userId}: ${JSON.stringify(room)}`);
+        const viewers = room.userCount || room.viewerCount || room.totalViewers || 0;
+        logEvent(`[DEBUG] Extracted viewers for ${userId}: userCount=${room.userCount}, viewerCount=${room.viewerCount}, totalViewers=${room.totalViewers}, used=${viewers}`);
         viewerCounts[userId] = viewers;
         if (viewers > (peakViewers[userId] || 0)) {
           peakViewers[userId] = viewers;
@@ -477,8 +486,6 @@ async function connectEulerWSForUser(username) {
 
         liveStatus[userId] = true;
         streamStartTimes[userId] = streamStart;
-        viewerCounts[userId] = 0;
-        peakViewers[userId] = 0;
         userCache[userId] = { uniqueId: user.uniqueId, avatarUrl: user.avatarUrl, coverUrl: room.coverUrl || null };
         if (room.title?.trim()) titleCache[userId] = room.title.trim();
         liveHistory.push({ userId, startTime: streamStart, endTime: null, title: room.title?.trim() || 'No title' });
@@ -695,6 +702,8 @@ client.once("clientReady", async () => {
         liveStatus[userId] = false;
         delete lastLiveUpdate[userId];
         saveState();
+        // Reconnect to resume live status checking
+        setTimeout(() => connectEulerWSForUser(userId), 2000);
       } catch (err) {
         logEvent(`❌ [${userId}] Failed to send offline embed (timeout check): ${err.message}`, "red");
       }
