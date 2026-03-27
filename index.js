@@ -668,46 +668,13 @@ client.once("clientReady", async () => {
 
   setInterval(async () => {
     const now = Date.now();
-    for (const userId of Object.keys(liveStatus)) {
-      if (!liveStatus[userId]) continue;
-      const last = lastLiveUpdate[userId] || 0;
-      if (now - last < OFFLINE_TIMEOUT_MS) continue;
-
-      logEvent(`🔵 [${userId}] No live update for ${OFFLINE_TIMEOUT_MS / 1000}s — marking offline.`, "yellow");
-      lastOfflineTime[userId] = now;
-      try {
-        const channel = await client.channels.fetch(alertChannelId);
-        const msgId = sentMessages[userId];
-        const startMs = streamStartTimes[userId] || now;
-        const embed = buildOfflineEmbed({
-          userId,
-          startMs,
-          endMs: now,
-          room: { title: titleCache[userId] },
-          user: userCache[userId] || { uniqueId: userId },
-        });
-
-        const oldMsg = msgId ? await channel.messages.fetch(msgId).catch(() => null) : null;
-        if (oldMsg) await oldMsg.delete().catch(() => null);
-        const newMsg = await channel.send({
-          content: `**${userId}'s stream has ended.**`,
-          embeds: [embed],
-          components: [liveActionRow(userId, false)],
-        });
-        sentMessages[userId] = newMsg.id;
-        const historyEntry = liveHistory.find(h => h.userId === userId && h.endTime === null);
-        if (historyEntry) {
-          historyEntry.endTime = now;
-        }
-        liveStatus[userId] = false;
-        delete lastLiveUpdate[userId];
-        saveState();
-        // Reconnect to resume live status checking
-        setTimeout(() => connectEulerWSForUser(userId), 2000);
-      } catch (err) {
-        logEvent(`❌ [${userId}] Failed to send offline embed (timeout check): ${err.message}`, "red");
-      }
-    }
+    // TEMP: Disabled offline timeout logic to prevent marking user offline when live
+    // for (const userId of Object.keys(liveStatus)) {
+    //   if (!liveStatus[userId]) continue;
+    //   const last = lastLiveUpdate[userId] || 0;
+    //   if (now - last < OFFLINE_TIMEOUT_MS) continue;
+    //   ...existing code for offline timeout...
+    // }
   }, 30 * 1000);
 });
 
