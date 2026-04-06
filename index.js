@@ -34,6 +34,7 @@ if (existsSync(envPath)) {
 const apiKey = process.env.EULER_API_KEY;
 const alertChannelId = process.env.ALERT_CHANNEL_ID;
 const ownerId = process.env.OWNER_ID;
+const DEBUG = process.env.DEBUG === "true" || process.env.DEBUG === "1";
 const MAX_RECONNECT_ATTEMPTS = parseInt(process.env.MAX_RECONNECT_ATTEMPTS || "4", 10);
 const FLICKER_COOLDOWN_MS = parseInt(process.env.FLICKER_COOLDOWN_MS || "120000", 10);
 const RECONNECT_DELAY_MS = parseInt(process.env.RECONNECT_DELAY_MS || "90000", 10);
@@ -131,6 +132,12 @@ function logEvent(message, color = "white") {
   } catch (err) {
     fileLoggingEnabled = false;
     console.warn(chalk.yellow(`⚠️ Disabling file logging: ${err.message}`));
+  }
+}
+
+function debugLog(message) {
+  if (DEBUG) {
+    logEvent(`[DEBUG] ${message}`);
   }
 }
 
@@ -436,7 +443,15 @@ async function connectEulerWSForUser(username) {
       const wasLive = !!liveStatus[userId];
 
       // DEBUG: Log every roomInfo message received
-      logEvent(`[DEBUG] Received roomInfo for ${userId}: isLive=${room.isLive}, now=${now}`);
+      debugLog(`Received roomInfo for ${userId}: isLive=${room.isLive}, now=${now}`);
+
+      // Always extract and update viewer counts, regardless of isLive status
+      const viewers = room.userCount || room.viewerCount || room.totalViewers || 0;
+      debugLog(`Extracted viewers for ${userId}: userCount=${room.userCount}, viewerCount=${room.viewerCount}, totalViewers=${room.totalViewers}, used=${viewers}`);
+      viewerCounts[userId] = viewers;
+      if (viewers > (peakViewers[userId] || 0)) {
+        peakViewers[userId] = viewers;
+      }
 
       if (room.isLive || !wasLive) {
         const previousAttempts = failedReconnects[username] || 0;
@@ -449,15 +464,9 @@ async function connectEulerWSForUser(username) {
       if (room.isLive) {
         lastLiveUpdate[userId] = now;
         // DEBUG: Log when lastLiveUpdate is set
-        logEvent(`[DEBUG] Updated lastLiveUpdate for ${userId}: ${now}`);
+        debugLog(`Updated lastLiveUpdate for ${userId}: ${now}`);
         // DEBUG: Log the raw room object and viewer count fields
-        logEvent(`[DEBUG] Raw room object for ${userId}: ${JSON.stringify(room)}`);
-        const viewers = room.userCount || room.viewerCount || room.totalViewers || 0;
-        logEvent(`[DEBUG] Extracted viewers for ${userId}: userCount=${room.userCount}, viewerCount=${room.viewerCount}, totalViewers=${room.totalViewers}, used=${viewers}`);
-        viewerCounts[userId] = viewers;
-        if (viewers > (peakViewers[userId] || 0)) {
-          peakViewers[userId] = viewers;
-        }
+        debugLog(`Raw room object for ${userId}: ${JSON.stringify(room)}`);
       }
 
       if (room.isLive && !wasLive) {
@@ -490,7 +499,7 @@ async function connectEulerWSForUser(username) {
           const channel = await client.channels.fetch(alertChannelId);
           const embed = buildLiveEmbed({ userId, room, user });
           const sent = await channel.send({
-            content: `@everyone **${userId} is now LIVE!**`,
+            content: `everyone **${userId} is now LIVE!**`,
             embeds: [embed],
             components: [liveActionRow(userId, true)],
           });

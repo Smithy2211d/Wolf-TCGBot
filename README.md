@@ -32,8 +32,6 @@ A sophisticated Discord bot that monitors TikTok streams using the Euler API Fre
 
 ##  Prerequisites
 
-##  Prerequisites
-
 - Node.js (v16 or higher)
 - A Discord Bot Token (from [Discord Developer Portal](https://discord.com/developers/applications))
 - Euler API Key (from [Euler Stream](https://www.eulerstream.com/))
